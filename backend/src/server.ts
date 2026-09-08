@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { prisma } from "./lib/prisma";
 import authRoutes from "./routes/auth.routes";
 import senderRoutes from "./routes/sender.routes";
+import scheduleRoutes from "./routes/schedule.routes";
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/auth", authRoutes); // Fallback alias for convenience
 app.use("/api/senders", senderRoutes);
+app.use("/api/emails/schedule", scheduleRoutes);
 
 app.get("/health", (req, res) => {
   res.status(200).json({

@@ -41,23 +41,27 @@ model Sender {
   isActive        Boolean  @default(false)
   createdAt       DateTime @default(now())
 
-  user   User       @relation(fields: [userId], references: [id])
-  emails EmailJob[]
+  user      User            @relation(fields: [userId], references: [id])
+  emails    EmailJob[]
+  campaigns EmailCampaign[]
 
   @@unique([userId, email])
 }
 
 model EmailCampaign {
-  id          String   @id @default(uuid())
-  userId      String
-  subject     String
-  body        String   @db.Text
-  startTime   DateTime
-  delayMs     Int
-  hourlyLimit Int
-  createdAt   DateTime @default(now())
+  id             String   @id @default(uuid())
+  userId         String
+  senderId       String
+  idempotencyKey String?  @unique
+  subject        String
+  body           String   @db.Text
+  startTime      DateTime
+  delayMs        Int
+  hourlyLimit    Int
+  createdAt      DateTime @default(now())
 
   user   User       @relation(fields: [userId], references: [id])
+  sender Sender     @relation(fields: [senderId], references: [id])
   emails EmailJob[]
 }
 
