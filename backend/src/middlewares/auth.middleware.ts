@@ -35,6 +35,11 @@ export const requireAuth = async (
       token = req.cookies.token;
     }
 
+    // 3. Fallback to query parameter (for direct browser dashboard links)
+    if (!token && req.query && typeof req.query.token === "string") {
+      token = req.query.token;
+    }
+
     if (!token) {
       res.status(401).json({
         error: "Unauthorized",
@@ -78,6 +83,17 @@ export const requireAuth = async (
     }
 
     req.user = user;
+
+    // Set cookie if authenticated via query param for seamless browser sessions
+    if (req.query?.token && !req.cookies?.token) {
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+    }
+
     next();
   } catch (error: any) {
     console.error("Auth Middleware Error:", error?.message || error);
