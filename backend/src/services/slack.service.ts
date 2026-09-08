@@ -338,7 +338,7 @@ export async function deliverSlackNotification(outboxId: string): Promise<boolea
     const result = await postSlackMessage(
       record.userId,
       record.channelId,
-      payload.text || "MailFlow Automated Notification",
+      payload.text || "Mail Scheduler Notification",
       payload.blocks
     );
 
@@ -379,9 +379,6 @@ export async function deliverSlackNotification(outboxId: string): Promise<boolea
   }
 }
 
-/**
- * Sends a verified test notification into the saved Slack channel.
- */
 export async function sendSlackTestNotification(userId: string): Promise<{ success: boolean; channel: string; ts?: string }> {
   const connection = await prisma.slackConnection.findUnique({
     where: { userId },
@@ -394,14 +391,14 @@ export async function sendSlackTestNotification(userId: string): Promise<{ succe
   const channelDisplay = connection.channelName ? `#${connection.channelName}` : connection.channelId;
   const timestamp = new Date().toLocaleTimeString("en-US", { timeZone: "UTC", timeZoneName: "short" });
 
-  const text = `MailFlow Test Alert: Notification system connected to ${channelDisplay}!`;
+  const text = `Mail Scheduler Test Alert: Notification system connected to ${channelDisplay}!`;
   const blocks = [
     {
       type: "header",
       text: {
         type: "plain_text",
-        text: "⚡ MailFlow Notification System Test",
-        emoji: true,
+        text: "Mail Scheduler Notification Test",
+        emoji: false,
       },
     },
     {

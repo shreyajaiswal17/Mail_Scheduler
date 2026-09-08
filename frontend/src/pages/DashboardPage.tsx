@@ -322,10 +322,10 @@ export const DashboardPage: React.FC = () => {
 
             <div className="flex-1 min-w-0 flex flex-col">
               <span className="text-[13px] font-semibold text-gray-900 truncate leading-tight">
-                {user?.name || "Oliver Brown"}
+                {user?.name || user?.email?.split("@")[0] || "Account"}
               </span>
               <span className="text-[11px] text-gray-400 truncate leading-tight">
-                {user?.email || "oliver.brown@domain.io"}
+                {user?.email || "Signed In"}
               </span>
             </div>
 
@@ -506,8 +506,7 @@ export const DashboardPage: React.FC = () => {
                   <ArrowLeft size={18} />
                 </button>
                 <h3 className="text-lg font-bold text-gray-900 m-0">
-                  {selectedEmail.subject}{" "}
-                  <span className="font-normal text-gray-400 text-sm">| MJWYT44 BM#52W01</span>
+                  {selectedEmail.subject}
                 </h3>
               </div>
 
@@ -541,47 +540,36 @@ export const DashboardPage: React.FC = () => {
 
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-full bg-emerald-500 text-white font-bold text-base flex items-center justify-center flex-shrink-0">
-                A
+                {selectedEmail.recipientEmail.charAt(0).toUpperCase()}
               </div>
               <div className="flex flex-col flex-1">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-bold text-gray-900">
-                    {selectedEmail.senderName || "Amanda Clark"}
+                    To: {selectedEmail.recipientEmail}
                   </span>
-                  <span className="text-xs text-gray-400">
-                    &lt;{selectedEmail.senderEmail || "sender@example.com"}&gt;
+                  <span
+                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                      selectedEmail.status === "SENT"
+                        ? "bg-gray-100 text-gray-600"
+                        : "bg-emerald-100 text-emerald-800"
+                    }`}
+                  >
+                    {selectedEmail.status === "SENT" ? "Sent" : "Scheduled"}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <span>to me</span>
-                  <ChevronDown size={12} />
+                  <span>From: {user?.name || user?.email || "Me"}</span>
                 </div>
               </div>
-              <span className="text-xs text-gray-400">{selectedEmail.date || "Nov 3, 10:23 AM"}</span>
+              <span className="text-xs text-gray-400">{selectedEmail.date || "Recently"}</span>
             </div>
 
-            <div className="text-sm leading-relaxed text-gray-800">
-              <p className="mb-4">Hey Oliver,</p>
-              <p className="mb-4">You've just RECEIVED something</p>
-
-              <div className="bg-amber-50/80 border-l-4 border-amber-500 p-4 rounded-md my-5 text-amber-950">
-                <p className="font-bold mb-1">
-                  ⚡ Extremely Exclusive—Only 4 Spots Worldwide Per Year | $25,000 investment ⚡
-                </p>
-                <p className="text-xs text-amber-900 m-0">
-                  To explore securing your private transformation, simply reply right now with{" "}
-                  <strong>"FLY OUT FIX"</strong>.
-                </p>
-              </div>
-
-              <p className="mb-4">Your coach for world-class performance,</p>
-              <p className="mb-4">Grant</p>
-
-              <p className="mt-5 text-gray-600 italic">
-                P.S. Always remember that you can develop world class technique! 🚀
-              </p>
-
-
+            <div className="text-sm leading-relaxed text-gray-800 bg-gray-50/60 rounded-xl p-6 border border-gray-100 whitespace-pre-wrap font-sans">
+              {selectedEmail.body ? (
+                selectedEmail.body
+              ) : (
+                <span className="text-gray-400 italic">No message content available for this email.</span>
+              )}
             </div>
           </div>
         ) : (
@@ -604,7 +592,6 @@ export const DashboardPage: React.FC = () => {
                   type="button"
                   className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                   title="Filter"
-                  onClick={() => alert("Filter applied")}
                 >
                   <Filter size={17} />
                 </button>

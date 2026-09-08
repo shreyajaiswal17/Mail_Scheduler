@@ -657,7 +657,7 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
                   )}
                 </button>
                 <p className="text-xs text-gray-400 m-0">
-                  Authorizes the MailFlow bot in your Slack workspace. OAuth tokens are stored encrypted and never exposed to the frontend.
+                  Authorizes the Mail Scheduler bot in your Slack workspace. OAuth tokens are stored encrypted and never exposed to the frontend.
                 </p>
               </div>
             </div>

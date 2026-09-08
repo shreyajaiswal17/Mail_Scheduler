@@ -7,9 +7,6 @@ import { AuthenticatedRequest } from "../middlewares/auth.middleware";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
-/**
- * Step 1: User clicks "Login with Google" -> Redirects to Google Consent Screen
- */
 export const initiateGoogleAuth = (req: Request, res: Response): void => {
   try {
     const oauth2Client = getOAuth2Client();
@@ -40,9 +37,6 @@ export const initiateGoogleAuth = (req: Request, res: Response): void => {
   }
 };
 
-/**
- * Step 2: Google redirects to our backend -> Backend verifies user -> Saves in PostgreSQL -> Redirects to dashboard
- */
 export const handleGoogleCallback = async (req: Request, res: Response): Promise<void> => {
   const { code, error } = req.query;
 
@@ -60,7 +54,6 @@ export const handleGoogleCallback = async (req: Request, res: Response): Promise
   try {
     const oauth2Client = getOAuth2Client();
 
-    // 1. Exchange authorization code for tokens
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
@@ -68,7 +61,6 @@ export const handleGoogleCallback = async (req: Request, res: Response): Promise
       throw new Error("No ID token returned from Google");
     }
 
-    // 2. Verify the ID token and get user payload
     const ticket = await oauth2Client.verifyIdToken({
       idToken: tokens.id_token,
       audience: getGoogleClientId(),
@@ -84,7 +76,6 @@ export const handleGoogleCallback = async (req: Request, res: Response): Promise
     const name = payload.name || email.split("@")[0];
     const avatar = payload.picture || null;
 
-    // 3. Save / Upsert user in PostgreSQL via Prisma
     const user = await prisma.user.upsert({
       where: { googleId },
       update: {
@@ -100,7 +91,6 @@ export const handleGoogleCallback = async (req: Request, res: Response): Promise
       },
     });
 
-    // 4. Optionally provision a default Sender entry for this user
     await prisma.sender.upsert({
       where: {
         userId_email: {
@@ -120,7 +110,6 @@ export const handleGoogleCallback = async (req: Request, res: Response): Promise
       },
     });
 
-    // 5. Generate session JWT
     const sessionToken = jwt.sign(
       {
         userId: user.id,
@@ -130,15 +119,13 @@ export const handleGoogleCallback = async (req: Request, res: Response): Promise
       { expiresIn: "7d" }
     );
 
-    // 6. Set HTTP-only cookie for secure browsers
     res.cookie("token", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    // 7. Redirect user to Dashboard on frontend (with token parameter for instant client-side hydration)
     res.redirect(`${FRONTEND_URL}/dashboard?token=${encodeURIComponent(sessionToken)}`);
   } catch (err: any) {
     console.error("Google Auth Callback Failed:", err?.message || err);
@@ -148,9 +135,6 @@ export const handleGoogleCallback = async (req: Request, res: Response): Promise
   }
 };
 
-/**
- * Step 3: Get the currently authenticated user profile
- */
 export const getCurrentUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     if (!req.user) {
@@ -168,9 +152,6 @@ export const getCurrentUser = async (req: AuthenticatedRequest, res: Response): 
   }
 };
 
-/**
- * Step 4: Logout
- */
 export const logout = (req: Request, res: Response): void => {
   res.clearCookie("token", {
     httpOnly: true,
@@ -184,9 +165,6 @@ export const logout = (req: Request, res: Response): void => {
   });
 };
 
-/**
- * Step 5: Direct email/password login
- */
 export const emailLogin = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
