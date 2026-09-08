@@ -1,5 +1,7 @@
+
 import { prisma } from "../lib/prisma";
 import { emailQueue } from "../queues/email.queue";
+import { reconcileElasticsearch, indexEmailJob } from "./elasticsearch.service";
 
 const LEASE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -8,6 +10,8 @@ export interface ReconciliationReport {
   reclaimedProcessingCount: number;
   ambiguousCount: number;
   reconciledJobCount: number;
+  elasticsearchSynced?: number;
+  elasticsearchBackfilled?: number;
 }
 
 /**
@@ -284,6 +288,15 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
         report.reconciledJobCount += missingJobs.length;
       }
     }
+
+    // 3. Reconcile Elasticsearch dirty queue and missing index records
+    try {
+      const esReport = await reconcileElasticsearch();
+      report.elasticsearchSynced = esReport.syncedDirty;
+      report.elasticsearchBackfilled = esReport.backfilled;
+    } catch (esErr: any) {
+      console.warn("[Reconciler] Non-blocking ES reconciliation error:", esErr.message);
+    }
   } catch (error) {
     console.error("[Reconciler] Error during database-to-queue reconciliation:", error);
   }
@@ -324,6 +337,7 @@ export async function resolveAmbiguousEmail(
         updatedAt: new Date(),
       },
     });
+    indexEmailJob(emailId).catch(() => {});
     return { success: true, message: `Email ${emailId} manually confirmed as SENT` };
   }
 
@@ -346,6 +360,7 @@ export async function resolveAmbiguousEmail(
       { emailId: email.id },
       { jobId: email.id, delay: 0 }
     );
+    indexEmailJob(emailId).catch(() => {});
 
     return {
       success: true,

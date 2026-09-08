@@ -6,6 +6,7 @@ import { redis } from "../lib/redis";
 import { decryptPassword } from "../lib/encryption";
 import { reserveSendingSlot } from "../services/rate-limiter.service";
 import { reconcileDatabaseToQueue } from "../services/outbox-reconciler.service";
+import { indexEmailJob } from "../services/elasticsearch.service";
 
 const concurrency = Number(process.env.WORKER_CONCURRENCY || 5);
 const LEASE_TIMEOUT_MS = 5 * 60 * 1000; // 5-minute lease timeout for stale crash recovery
@@ -190,6 +191,7 @@ export const emailWorker = new Worker(
           updatedAt: new Date(),
         },
       });
+      indexEmailJob(email.id).catch(() => {});
       throw new UnrecoverableError(configError);
     }
 
@@ -220,6 +222,7 @@ export const emailWorker = new Worker(
           updatedAt: new Date(),
         },
       });
+      indexEmailJob(email.id).catch(() => {});
 
       // Move job back to BullMQ delayed state without consuming retry attempts
       await job.moveToDelayed(nextEligibleTime, token);
@@ -275,6 +278,7 @@ export const emailWorker = new Worker(
           updatedAt: new Date(),
         },
       });
+      indexEmailJob(email.id).catch(() => {});
 
       if (updateResult.count === 0) {
         console.warn(
@@ -315,6 +319,7 @@ export const emailWorker = new Worker(
             updatedAt: new Date(),
           },
         });
+        indexEmailJob(email.id).catch(() => {});
 
         throw new UnrecoverableError(error.message);
       }
@@ -336,6 +341,7 @@ export const emailWorker = new Worker(
             updatedAt: new Date(),
           },
         });
+        indexEmailJob(email.id).catch(() => {});
 
         throw error;
       }
@@ -357,6 +363,7 @@ export const emailWorker = new Worker(
           updatedAt: new Date(),
         },
       });
+      indexEmailJob(email.id).catch(() => {});
 
       throw error;
     }
