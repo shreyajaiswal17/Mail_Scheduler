@@ -49,6 +49,26 @@ export const DashboardPage: React.FC = () => {
     teamId?: string | null;
   } | null>(null);
 
+  const handleSlackStatusChange = useCallback(
+    (status: { connected: boolean; teamName?: string | null; teamId?: string | null }) => {
+      setSlackStatus((prev) => {
+        if (
+          prev?.connected === status.connected &&
+          prev?.teamName === status.teamName &&
+          prev?.teamId === status.teamId
+        ) {
+          return prev;
+        }
+        return {
+          connected: status.connected,
+          teamName: status.teamName,
+          teamId: status.teamId,
+        };
+      });
+    },
+    []
+  );
+
   // Modal & form state (transient only — never stored in persistent storage)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -398,15 +418,7 @@ export const DashboardPage: React.FC = () => {
 
         {/* Slack Workspace Integration Section */}
         <section className="integrations-section">
-          <SlackConnectionCard
-            onStatusChange={(status) =>
-              setSlackStatus({
-                connected: status.connected,
-                teamName: status.teamName,
-                teamId: status.teamId,
-              })
-            }
-          />
+          <SlackConnectionCard onStatusChange={handleSlackStatusChange} />
         </section>
 
         {/* Sender & Pipeline Section */}

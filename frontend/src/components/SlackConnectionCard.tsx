@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   CheckCircle2,
   AlertCircle,
@@ -64,6 +64,11 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const onStatusChangeRef = useRef(onStatusChange);
+  useEffect(() => {
+    onStatusChangeRef.current = onStatusChange;
+  }, [onStatusChange]);
+
   const getAuthHeaders = (): Record<string, string> => {
     const token = localStorage.getItem("auth_token");
     return {
@@ -72,9 +77,9 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
     };
   };
 
-  const fetchStatus = useCallback(async () => {
+  const fetchStatus = useCallback(async (showLoading = true) => {
     try {
-      setIsLoading(true);
+      if (showLoading) setIsLoading(true);
       const res = await fetch(`${API_BASE_URL}/api/slack/status`, {
         headers: getAuthHeaders(),
         credentials: "include",
@@ -83,9 +88,10 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
       if (res.ok) {
         const data: SlackStatusResponse = await res.json();
         setStatus(data);
-        if (onStatusChange) onStatusChange(data);
+        onStatusChangeRef.current?.(data);
       } else if (res.status === 401) {
         setStatus({ connected: false });
+        onStatusChangeRef.current?.({ connected: false });
       } else {
         const data = await res.json().catch(() => ({}));
         setErrorMessage(data.message || "Unable to check Slack status");
@@ -94,9 +100,9 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
       console.error("[Slack] Failed to fetch status:", err);
       setErrorMessage("Network error while checking Slack integration");
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
-  }, [onStatusChange]);
+  }, []);
 
   // Handle OAuth callback params on mount and fetch initial status
   useEffect(() => {
@@ -251,7 +257,7 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
 
         <div className="slack-header-actions">
           <button
-            onClick={fetchStatus}
+            onClick={() => fetchStatus(true)}
             disabled={isLoading || isConnecting || isDisconnecting}
             className="icon-btn-refresh"
             title="Refresh Slack Status"
