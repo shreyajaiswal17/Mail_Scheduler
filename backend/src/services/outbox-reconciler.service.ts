@@ -123,20 +123,8 @@ export async function dispatchOutboxBatch(
   return jobsToEnqueue.length;
 }
 
-/**
- * Reconciles database state with BullMQ without using cron.
- *
- * Runs during:
- * 1. Server / Worker boot (startup reconciliation)
- * 2. Scheduling request lifecycle (opportunistic reconciliation)
- * 3. BullMQ queue drain lifecycle events (debounced via Redis lock)
- *
- * Conservative Policy:
- * - Stale PROCESSING with messageId -> Resolved to SENT.
- * - Stale PROCESSING with smtpAttemptStartedAt == null -> Definitely never called SMTP; reclaimed to SCHEDULED.
- * - Stale PROCESSING with smtpAttemptStartedAt != null & messageId == null -> Ambiguous delivery outcome;
- *   marked as NEEDS_REVIEW to prevent automatic duplicate resend.
- */
+// Reconciles database state with BullMQ without cron.
+// Reclaims unattempted jobs, resolves confirmed sends, and marks ambiguous attempts for review.
 export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> {
   const report: ReconciliationReport = {
     dispatchedOutboxCount: 0,

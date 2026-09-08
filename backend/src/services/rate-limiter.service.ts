@@ -27,47 +27,10 @@ export interface RateLimitResult {
   campaignDelayMs?: number | null;
 }
 
-const ONE_HOUR_MS = 60 * 60 * 1000; // 3,600,000 ms
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
-/**
- * [QUOTA ACCOUNTING POLICY]:
- * Quotas count SMTP SEND ATTEMPTS / DISPATCH STARTS (reservations), NOT confirmed successful deliveries.
- *
- * Rationale:
- * 1. Email Service Providers (ESPs) and SMTP servers rate-limit incoming TCP connections and AUTH/DATA attempts.
- * 2. If an SMTP server is failing with temporary 4xx errors, counting attempts prevents workers from hammering
- *    the remote mail server with repeated retries and violating connection rate limits.
- * 3. Minimum delay guarantee is strictly defined as spacing between SMTP dispatch STARTS (reservation timestamps),
- *    preventing burst transmissions across concurrent workers.
- *
- * [DUAL-TIER POLICY]:
- * 1. Global Sender Limits:
- *    - Enforced across ALL campaigns sharing this sender account.
- *    - Sender Minimum Delay: MIN_DELAY_MS (default 2000ms).
- *    - Sender Hourly Maximum: MAX_EMAILS_PER_HOUR_PER_SENDER (default 100/hour).
- *    - No campaign can exceed or bypass the sender's configured maximum.
- * 2. Campaign-Specific Limits (if provided):
- *    - Enforced independently in isolated campaign Redis keys.
- *    - Campaign Minimum Delay: campaignDelayMs (ensures this campaign paces itself).
- *    - Campaign Hourly Quota: campaignHourlyLimit (ensures this campaign does not monopolize the sender).
- *    - Both tiers are evaluated atomically; reservation is granted ONLY if both pass.
- */
-
-/**
- * Atomic Redis Lua script:
- * KEYS[1]: Sender last send timestamp ("ratelimit:sender:{senderId}:last_send")
- * KEYS[2]: Sender hourly counter ("ratelimit:sender:{senderId}:hourly:{windowStartMs}")
- * Optional (passed if campaignId is present):
- * KEYS[3]: Campaign last send timestamp ("ratelimit:campaign:{campaignId}:last_send")
- * KEYS[4]: Campaign hourly counter ("ratelimit:campaign:{campaignId}:hourly:{windowStartMs}")
- *
- * ARGV[1]: Current timestamp in ms (now)
- * ARGV[2]: Sender minimum delay in ms
- * ARGV[3]: Sender global hourly limit
- * ARGV[4]: Campaign minimum delay in ms (0 if none)
- * ARGV[5]: Campaign hourly limit (0 if none)
- * ARGV[6]: End of current 1-hour window in ms (windowEndMs)
- */
+// Quota counts dispatch starts/reservations to protect remote SMTP connections.
+// Enforces global sender limits first, then campaign limits if configured.
 const RATE_LIMIT_LUA_SCRIPT = `
 local now = tonumber(ARGV[1])
 local senderMinDelayMs = tonumber(ARGV[2])

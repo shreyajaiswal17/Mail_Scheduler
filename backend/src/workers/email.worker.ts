@@ -10,15 +10,7 @@ import { reconcileDatabaseToQueue } from "../services/outbox-reconciler.service"
 const concurrency = Number(process.env.WORKER_CONCURRENCY || 5);
 const LEASE_TIMEOUT_MS = 5 * 60 * 1000; // 5-minute lease timeout for stale crash recovery
 
-/**
- * Classifies SMTP and transport errors into permanent vs temporary.
- *
- * RFC 5321 & SMTP Conventions:
- * - 4xx response codes: Transient / Temporary failures (e.g., 421 service unavailable, 450 mailbox busy, 451 local error, 452 storage full, 454 temporary auth failure). Always retry.
- * - 5xx response codes: Permanent failures (e.g., 550 mailbox not found, 551 user not local, 553 invalid address, 535 invalid credentials).
- * - Network errors: ECONNRESET, ETIMEDOUT, ESOCKETTIMEDOUT, ECONNREFUSED, ENOTFOUND, EPIPE, EAI_AGAIN, ENETUNREACH are transient network issues.
- * - EAUTH: Not all authentication errors are permanent (e.g. 454 temporary auth failures, server busy, or network resets during auth). It is permanent ONLY when confirmed with a 5xx response code or explicit credential rejection.
- */
+// 5xx and invalid credentials are permanent; 4xx and network errors are retryable
 function isPermanentSmtpError(error: any): boolean {
   if (!error) return false;
 
@@ -95,8 +87,7 @@ export const emailWorker = new Worker(
   async (job, token) => {
     const emailId = job.data.emailId;
 
-    // 1. Database-Backed Atomic Claim / Fenced Lease
-    // Uses a unique claimToken and leaseExpiresAt so stale workers cannot overwrite newer worker results.
+    // Atomic lease claim with expiry
     const claimToken = crypto.randomUUID();
     const now = new Date();
     const leaseExpiresAt = new Date(now.getTime() + LEASE_TIMEOUT_MS);
@@ -121,7 +112,6 @@ export const emailWorker = new Worker(
     });
 
     if (claim.count === 0) {
-      // Lease acquisition failed — inspect state to log clearly
       const current = await prisma.emailJob.findUnique({
         where: { id: emailId },
         select: {
@@ -132,31 +122,24 @@ export const emailWorker = new Worker(
         },
       });
 
-      // 1. If record does not exist in database, discard orphaned BullMQ job
+      // Discard orphaned BullMQ job if record was deleted from DB
       if (!current) {
         console.warn(
-          `[Claim Guard] Job ${emailId} record does not exist in database. Discarding orphaned queue job.`
+          `[Claim Guard] Job ${emailId} not in DB. Discarding queue job.`
         );
-        return { message: "Orphaned job discarded (not found in database)" };
+        return { message: "Orphaned job discarded" };
       }
 
       if (current.status === "SENT") {
-        console.log(
-          `[Claim Guard] Job ${emailId} already SENT (Message ID: ${current.messageId}). Skipping duplicate execution.`
-        );
         return { message: "Email already sent", messageId: current.messageId };
       }
 
       if (current.status === "FAILED" || current.status === "NEEDS_REVIEW") {
-        console.log(
-          `[Claim Guard] Job ${emailId} is in status ${current.status}. Skipping duplicate execution.`
-        );
-        return { message: `Job already in terminal status ${current.status}` };
+        return { message: `Job already terminal: ${current.status}` };
       }
 
       if (current.status === "PROCESSING") {
-        // Another worker is actively holding the lease, OR a previous worker crashed
-        // and the lease has not expired yet. Delay until lease expiration to avoid dropping job.
+        // Leased by another worker; re-check after lease expires
         const remainingLeaseMs = Math.max(
           5000,
           (current.leaseExpiresAt?.getTime() ||
@@ -165,18 +148,11 @@ export const emailWorker = new Worker(
             1000
         );
 
-        console.log(
-          `[Claim Guard] Job ${emailId} is actively leased. Rescheduling in ${remainingLeaseMs}ms to avoid dropping job.`
-        );
-
         await job.moveToDelayed(Date.now() + remainingLeaseMs, token);
         throw new DelayedError();
       }
 
-      // If status is SCHEDULED or RATE_LIMITED, a concurrent worker updated it; delay briefly to re-attempt claim
-      console.log(
-        `[Claim Guard] Job ${emailId} claim missed (status: ${current.status}). Retrying in 5s...`
-      );
+      // Claim missed; retry shortly
       await job.moveToDelayed(Date.now() + 5000, token);
       throw new DelayedError();
     }
@@ -232,8 +208,7 @@ export const emailWorker = new Worker(
         `[Rate Limiter] Sender ${sender.email} rate-limited (${reservation.reason}). Delaying job ${job.id} for ${reservation.retryAfterMs}ms (until ${new Date(nextEligibleTime).toISOString()}).`
       );
 
-      // Release lease back to RATE_LIMITED so future workers can claim it when eligible
-      // Preserve original scheduledAt intact, update nextEligibleAt to the rate-limited time
+      // Delay job until next eligible time
       await prisma.emailJob.updateMany({
         where: { id: email.id, claimToken },
         data: {
@@ -251,9 +226,7 @@ export const emailWorker = new Worker(
       throw new DelayedError();
     }
 
-    // 4. Pre-SMTP Send Stamp
-    // Confirms that this worker is actively starting SMTP transmission.
-    // If the process crashes after this point without writing messageId, delivery outcome is AMBIGUOUS.
+    // Record SMTP attempt start before sending
     const preStamp = await prisma.emailJob.updateMany({
       where: { id: email.id, claimToken },
       data: {
@@ -269,7 +242,7 @@ export const emailWorker = new Worker(
       return { message: "Lease lost before SMTP dispatch" };
     }
 
-    // 5. Send Email via Nodemailer SMTP Transport
+    // Send via SMTP
     try {
       const transporter = nodemailer.createTransport({
         host: sender.smtpHost,
@@ -288,7 +261,7 @@ export const emailWorker = new Worker(
         text: email.body,
       });
 
-      // 6. Confirm delivery in PostgreSQL fenced by claimToken
+      // Mark as SENT with fencing token
       const updateResult = await prisma.emailJob.updateMany({
         where: { id: email.id, claimToken },
         data: {
@@ -367,8 +340,7 @@ export const emailWorker = new Worker(
         throw error;
       }
 
-      // Temporary failure with retries remaining:
-      // DO NOT mark as FAILED! Reset status to SCHEDULED so BullMQ backoff retry can re-claim and process it.
+      // Temporary failure: reset status for BullMQ retry
       console.warn(
         `[Worker] Temporary failure on attempt ${currentAttempt}/${maxAttempts} for ${email.recipientEmail}: ${error.message}. Retrying via BullMQ backoff...`
       );
