@@ -10,12 +10,12 @@ const MainContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="loading-screen">
-        <div className="logo-icon-wrapper" style={{ width: 48, height: 48, marginBottom: 8 }}>
-          <Mail size={26} />
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-white text-gray-600">
+        <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-white mb-2 shadow-sm">
+          <Mail size={24} />
         </div>
-        <div className="loading-spinner"></div>
-        <p>Verifying secure session...</p>
+        <div className="w-7 h-7 border-2 border-gray-200 border-t-emerald-500 rounded-full animate-spin"></div>
+        <p className="text-sm font-medium text-gray-500">Verifying secure session...</p>
       </div>
     );
   }

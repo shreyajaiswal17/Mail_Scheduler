@@ -46,8 +46,7 @@ const SlackLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
     width={size}
     height={size}
     viewBox="0 0 122.8 122.8"
-    className="slack-svg-icon"
-    style={{ display: "inline-block", verticalAlign: "middle" }}
+    className="inline-block align-middle"
   >
     <path
       d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zm6.5 0c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z"
@@ -156,7 +155,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
     }
   }, [fetchChannels]);
 
-  // Handle OAuth callback params on mount and fetch initial status
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const slackAction = urlParams.get("slack");
@@ -166,7 +164,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
     if (slackAction === "connected") {
       const decodedTeam = teamParam ? decodeURIComponent(teamParam) : "Workspace";
       setSuccessMessage(`Successfully connected Slack workspace: ${decodedTeam}!`);
-      // Clean query params so refresh doesn't replay toast
       const cleanUrl = window.location.pathname;
       window.history.replaceState({}, document.title, cleanUrl);
     } else if (slackAction === "error") {
@@ -179,7 +176,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
     fetchStatus();
   }, [fetchStatus]);
 
-  // Initiate real OAuth flow
   const handleConnectSlack = async () => {
     try {
       setIsConnecting(true);
@@ -198,7 +194,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
       }
 
       if (data.url) {
-        // Redirect browser to Slack's real OAuth authorization page
         window.location.href = data.url;
       } else {
         throw new Error("No authorization URL received from server");
@@ -210,7 +205,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
     }
   };
 
-  // Save selected channel
   const handleSaveChannel = async () => {
     const channelToSave = useCustomChannel ? customChannelInput.trim() : selectedChannel;
     if (!channelToSave) {
@@ -255,7 +249,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
     }
   };
 
-  // Send live test notification
   const handleSendTestNotification = async () => {
     try {
       setIsSendingTest(true);
@@ -282,7 +275,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
     }
   };
 
-  // Disconnect existing Slack connection
   const handleDisconnect = async () => {
     try {
       setIsDisconnecting(true);
@@ -319,130 +311,129 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
 
   const isConnected = Boolean(status?.connected);
 
-
   return (
-    <div className="slack-integration-card">
+    <div className="bg-white border border-gray-200 rounded-xl p-6">
       {/* Success Banner */}
       {successMessage && (
-        <div className="slack-alert-banner success animate-fade-in">
-          <div className="alert-content">
-            <CheckCircle2 size={18} className="alert-icon-success" />
+        <div className="flex items-center justify-between p-3 rounded-lg text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 mb-4 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-emerald-600" />
             <span>{successMessage}</span>
           </div>
           <button
             onClick={() => setSuccessMessage(null)}
-            className="slack-alert-close-btn"
+            className="text-emerald-500 hover:text-emerald-800 cursor-pointer"
             title="Dismiss"
           >
-            <X size={15} />
+            <X size={14} />
           </button>
         </div>
       )}
 
       {/* Error Banner */}
       {errorMessage && (
-        <div className="slack-alert-banner error animate-fade-in">
-          <div className="alert-content">
-            <AlertCircle size={18} className="alert-icon-error" />
+        <div className="flex items-center justify-between p-3 rounded-lg text-xs bg-red-50 border border-red-200 text-red-800 mb-4 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="text-red-600" />
             <span>{errorMessage}</span>
           </div>
           <button
             onClick={() => setErrorMessage(null)}
-            className="slack-alert-close-btn"
+            className="text-red-500 hover:text-red-800 cursor-pointer"
             title="Dismiss"
           >
-            <X size={15} />
+            <X size={14} />
           </button>
         </div>
       )}
 
-      <div className="slack-card-header">
-        <div className="slack-header-brand">
-          <div className="slack-icon-container">
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center flex-shrink-0 shadow-2xs">
             <SlackLogo size={24} />
           </div>
-          <div className="slack-header-info">
-            <div className="slack-title-row">
-              <h3>Slack Integration</h3>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2.5">
+              <h3 className="text-base font-bold text-gray-900 m-0">Slack Integration</h3>
               {isLoading ? (
-                <span className="status-pill status-loading">
-                  <Loader2 size={11} className="spin" /> Checking...
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 border border-gray-200 text-gray-500">
+                  <Loader2 size={11} className="animate-spin" /> Checking...
                 </span>
               ) : isConnected ? (
-                <span className="status-pill status-connected">
-                  <span className="pulsing-green-dot" /> Connected
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" /> Connected
                 </span>
               ) : (
-                <span className="status-pill status-disconnected">
-                  <span className="muted-dot" /> Disconnected
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 border border-gray-200 text-gray-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400" /> Disconnected
                 </span>
               )}
             </div>
-            <p className="slack-subtitle">
+            <p className="text-xs text-gray-500 mt-0.5">
               Synchronize dispatch metrics, failure alerts, and scheduling notices with your Slack workspace
             </p>
           </div>
         </div>
 
-        <div className="slack-header-actions">
+        <div>
           <button
             onClick={() => fetchStatus(true)}
             disabled={isLoading || isConnecting || isDisconnecting}
-            className="icon-btn-refresh"
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition cursor-pointer"
             title="Refresh Slack Status"
             id="refresh-slack-status-btn"
           >
-            <RefreshCw size={14} className={isLoading ? "spin" : ""} />
+            <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
-      <div className="slack-card-body">
+      <div>
         {isLoading ? (
-          <div className="slack-loading-state">
-            <Loader2 size={24} className="spin text-purple" />
+          <div className="flex items-center justify-center gap-3 py-10 text-gray-400 text-xs">
+            <Loader2 size={20} className="animate-spin text-emerald-500" />
             <span>Checking Slack integration status...</span>
           </div>
         ) : isConnected ? (
           /* Connected State */
-          <div className="slack-connected-view animate-fade-in">
-            <div className="slack-details-grid">
-              <div className="slack-detail-box">
-                <div className="detail-box-label">
-                  <Building2 size={14} />
+          <div className="flex flex-col animate-fade-in">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
+              <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 uppercase mb-1">
+                  <Building2 size={13} />
                   <span>Workspace Name</span>
                 </div>
-                <div className="detail-box-val highlight">
+                <div className="text-sm font-bold text-gray-900 truncate">
                   {status?.teamName || "Connected Workspace"}
                 </div>
               </div>
 
-              <div className="slack-detail-box">
-                <div className="detail-box-label">
-                  <Hash size={14} />
+              <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 uppercase mb-1">
+                  <Hash size={13} />
                   <span>Team ID</span>
                 </div>
-                <div className="detail-box-val mono-text">
+                <div className="text-xs font-mono text-gray-600">
                   {status?.teamId || "—"}
                 </div>
               </div>
 
-              <div className="slack-detail-box">
-                <div className="detail-box-label">
-                  <ShieldCheck size={14} />
+              <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 uppercase mb-1">
+                  <ShieldCheck size={13} />
                   <span>Bot User ID</span>
                 </div>
-                <div className="detail-box-val mono-text">
+                <div className="text-xs font-mono text-gray-600">
                   {status?.botUserId || "—"}
                 </div>
               </div>
 
-              <div className="slack-detail-box">
-                <div className="detail-box-label">
-                  <Clock size={14} />
+              <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 uppercase mb-1">
+                  <Clock size={13} />
                   <span>Connected At</span>
                 </div>
-                <div className="detail-box-val">
+                <div className="text-xs text-gray-600">
                   {status?.connectedAt
                     ? new Date(status.connectedAt).toLocaleDateString(undefined, {
                         year: "numeric",
@@ -456,57 +447,57 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
               </div>
             </div>
 
-            <div className="slack-security-note">
-              <ShieldCheck size={14} className="security-icon" />
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-3.5 py-2 rounded-lg mb-5">
+              <ShieldCheck size={15} className="text-emerald-600 flex-shrink-0" />
               <span>
                 Bot token encrypted with AES-256-GCM in PostgreSQL. Token is never stored or exposed to the client.
               </span>
             </div>
 
-          
-            <div className="slack-channel-config-card">
-              <div className="channel-config-header">
-                <div className="channel-config-title">
-                  <BellRing size={16} className="text-purple" />
-                  <h4>Alert Notification Channel</h4>
+            {/* Notification Channel Configuration */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <BellRing size={15} className="text-emerald-600" />
+                  <h4 className="text-xs font-bold text-gray-900 m-0">Alert Notification Channel</h4>
                 </div>
                 {status?.channelId ? (
-                  <span className="current-channel-badge">
-                    <Hash size={12} />
+                  <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 font-semibold text-xs px-2.5 py-0.5 rounded-full">
+                    <Hash size={11} />
                     {status.channelName || status.channelId}
                   </span>
                 ) : (
-                  <span className="current-channel-badge unconfigured">
+                  <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-0.5 rounded-full">
                     No channel configured
                   </span>
                 )}
               </div>
 
-              <p className="channel-config-subtitle">
+              <p className="text-xs text-gray-500 mb-3">
                 Select where rate-limit warnings and dispatch notifications will be posted. When an email sender reaches its hourly limit, an alert is automatically delivered here.
               </p>
 
               {channelSuccessMessage && (
-                <div className="slack-mini-alert success animate-fade-in">
-                  <CheckCircle2 size={15} />
+                <div className="flex items-center gap-2 p-2 mb-3 rounded-lg text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 animate-fade-in">
+                  <CheckCircle2 size={14} />
                   <span>{channelSuccessMessage}</span>
                 </div>
               )}
 
               {testNotificationMessage && (
-                <div className="slack-mini-alert success animate-fade-in">
-                  <CheckCircle2 size={15} />
+                <div className="flex items-center gap-2 p-2 mb-3 rounded-lg text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 animate-fade-in">
+                  <CheckCircle2 size={14} />
                   <span>{testNotificationMessage}</span>
                 </div>
               )}
 
-              <div className="channel-selection-row">
-                <div className="channel-input-container">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex-1 min-w-[240px]">
                   {!useCustomChannel ? (
-                    <div className="channel-select-wrap">
+                    <div className="flex items-center gap-2.5">
                       <select
                         id="slack-channel-select"
-                        className="channel-dropdown-select"
+                        className="flex-1 h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs text-gray-800 outline-none focus:border-emerald-500 cursor-pointer"
                         value={selectedChannel}
                         onChange={(e) => setSelectedChannel(e.target.value)}
                         disabled={isLoadingChannels || isSavingChannel}
@@ -520,18 +511,18 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
                       </select>
                       <button
                         type="button"
-                        className="btn-link-toggle"
+                        className="text-xs text-emerald-600 hover:underline cursor-pointer flex-shrink-0"
                         onClick={() => setUseCustomChannel(true)}
                       >
                         Enter manually
                       </button>
                     </div>
                   ) : (
-                    <div className="channel-custom-input-wrap">
+                    <div className="flex items-center gap-2.5">
                       <input
                         id="slack-custom-channel-input"
                         type="text"
-                        className="channel-text-input"
+                        className="flex-1 h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs text-gray-800 outline-none focus:border-emerald-500"
                         placeholder="#mail-scheduler-alerts or C0C0761S84B"
                         value={customChannelInput}
                         onChange={(e) => setCustomChannelInput(e.target.value)}
@@ -539,7 +530,7 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
                       />
                       <button
                         type="button"
-                        className="btn-link-toggle"
+                        className="text-xs text-emerald-600 hover:underline cursor-pointer flex-shrink-0"
                         onClick={() => setUseCustomChannel(false)}
                       >
                         Choose from list
@@ -548,21 +539,21 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
                   )}
                 </div>
 
-                <div className="channel-action-btns">
+                <div className="flex items-center gap-2.5">
                   <button
                     id="save-slack-channel-btn"
-                    className="btn-save-channel"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs"
                     onClick={handleSaveChannel}
                     disabled={isSavingChannel || (!selectedChannel && !customChannelInput.trim())}
                   >
                     {isSavingChannel ? (
                       <>
-                        <Loader2 size={14} className="spin" />
+                        <Loader2 size={13} className="animate-spin" />
                         <span>Saving...</span>
                       </>
                     ) : (
                       <>
-                        <Check size={14} />
+                        <Check size={13} />
                         <span>Save Channel</span>
                       </>
                     )}
@@ -570,19 +561,19 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
 
                   <button
                     id="send-slack-test-btn"
-                    className="btn-test-notification"
+                    className="bg-white border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold text-xs px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 transition cursor-pointer"
                     onClick={handleSendTestNotification}
                     disabled={isSendingTest || !status?.channelId}
                     title={!status?.channelId ? "Please save a channel first" : "Send a live test alert to Slack"}
                   >
                     {isSendingTest ? (
                       <>
-                        <Loader2 size={14} className="spin" />
+                        <Loader2 size={13} className="animate-spin" />
                         <span>Sending...</span>
                       </>
                     ) : (
                       <>
-                        <Send size={14} />
+                        <Send size={13} />
                         <span>Send Test Alert</span>
                       </>
                     )}
@@ -591,22 +582,22 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
               </div>
             </div>
 
-            <div className="slack-action-toolbar">
+            <div className="flex items-center gap-3">
               <button
                 id="slack-reconnect-btn"
-                className="btn-slack-reconnect"
+                className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-semibold text-xs px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 transition cursor-pointer"
                 onClick={handleConnectSlack}
                 disabled={isConnecting || isDisconnecting}
                 title="Change or re-authorize Slack workspace"
               >
                 {isConnecting ? (
                   <>
-                    <Loader2 size={15} className="spin" />
+                    <Loader2 size={14} className="animate-spin" />
                     <span>Redirecting to Slack...</span>
                   </>
                 ) : (
                   <>
-                    <ExternalLink size={15} />
+                    <ExternalLink size={14} />
                     <span>Reconnect / Change Workspace</span>
                   </>
                 )}
@@ -614,19 +605,19 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
 
               <button
                 id="slack-disconnect-btn"
-                className="btn-slack-disconnect"
+                className="bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 font-semibold text-xs px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 transition cursor-pointer"
                 onClick={handleDisconnect}
                 disabled={isDisconnecting || isConnecting}
                 title="Disconnect Slack workspace"
               >
                 {isDisconnecting ? (
                   <>
-                    <Loader2 size={15} className="spin" />
+                    <Loader2 size={14} className="animate-spin" />
                     <span>Disconnecting...</span>
                   </>
                 ) : (
                   <>
-                    <Unlink size={15} />
+                    <Unlink size={14} />
                     <span>Disconnect</span>
                   </>
                 )}
@@ -635,43 +626,43 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
           </div>
         ) : (
           /* Disconnected State */
-          <div className="slack-disconnected-view animate-fade-in">
-            <div className="slack-empty-content">
-              <div className="slack-features-chips">
-                <div className="feature-chip">
-                  <CheckCircle2 size={13} className="chip-check" />
+          <div className="flex flex-col animate-fade-in">
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-2.5 flex-wrap">
+                <div className="inline-flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">
+                  <CheckCircle2 size={13} className="text-emerald-500" />
                   <span>Live Dispatch Alerts</span>
                 </div>
-                <div className="feature-chip">
-                  <CheckCircle2 size={13} className="chip-check" />
+                <div className="inline-flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">
+                  <CheckCircle2 size={13} className="text-emerald-500" />
                   <span>Delivery Bounce Warnings</span>
                 </div>
-                <div className="feature-chip">
-                  <CheckCircle2 size={13} className="chip-check" />
+                <div className="inline-flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">
+                  <CheckCircle2 size={13} className="text-emerald-500" />
                   <span>AES-256 Server-Side Token Encryption</span>
                 </div>
               </div>
 
-              <div className="slack-cta-box">
+              <div className="flex items-center gap-4 flex-wrap mt-2">
                 <button
                   id="connect-slack-btn"
-                  className="btn-connect-slack"
+                  className="bg-gradient-to-br from-[#4A154B] to-[#611f69] text-white font-semibold text-xs px-5 py-2.5 rounded-lg inline-flex items-center gap-2 shadow-xs hover:opacity-95 transition cursor-pointer"
                   onClick={handleConnectSlack}
                   disabled={isConnecting}
                 >
                   {isConnecting ? (
                     <>
-                      <Loader2 size={18} className="spin" />
+                      <Loader2 size={16} className="animate-spin" />
                       <span>Initiating OAuth Handshake...</span>
                     </>
                   ) : (
                     <>
-                      <SlackLogo size={18} />
+                      <SlackLogo size={16} />
                       <span>Connect Slack</span>
                     </>
                   )}
                 </button>
-                <p className="slack-connect-hint">
+                <p className="text-xs text-gray-400 m-0">
                   Authorizes the MailFlow bot in your Slack workspace. OAuth tokens are stored encrypted and never exposed to the frontend.
                 </p>
               </div>

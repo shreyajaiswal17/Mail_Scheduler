@@ -1,23 +1,26 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
-  Mail,
-  LogOut,
-  CheckCircle2,
   Clock,
   Send,
   Users,
-  Shield,
-  ArrowRight,
-  RefreshCw,
-  Sparkles,
+  Search,
+  Filter,
+  RotateCw,
   Plus,
+  Star,
+  ChevronDown,
   X,
+  CheckCircle2,
   AlertCircle,
-  AlertTriangle,
   Loader2,
   Server,
-  KeyRound,
+  LogOut,
+  Mail,
+  Trash2,
+  Archive,
+  ArrowLeft,
+  MessageSquare,
 } from "lucide-react";
 import { ComposeEmailModal } from "../components/ComposeEmailModal";
 import { SlackConnectionCard } from "../components/SlackConnectionCard";
@@ -33,50 +36,115 @@ interface Sender {
   createdAt: string;
 }
 
+interface EmailItem {
+  id: string;
+  recipientEmail: string;
+  subject: string;
+  snippet?: string;
+  body?: string;
+  status: string;
+  date?: string;
+  scheduledAt?: string;
+  sentAt?: string;
+  starred?: boolean;
+  senderName?: string;
+  senderEmail?: string;
+}
+
+const DEMO_SENT_EMAILS: EmailItem[] = [
+  {
+    id: "sent-1",
+    recipientEmail: "Sarah Wilson",
+    subject: "Re: Project Update",
+    snippet: "Thanks for the update, Sarah. Looks good!",
+    body: "Hey Sarah,\n\nThanks for the update, Sarah. Looks good! Everything is tracking on schedule for next week's release. Let me know if you need any additional assets.\n\nBest regards,\nOliver",
+    status: "SENT",
+    date: "Nov 3, 10:23 AM",
+    starred: false,
+    senderName: "Amanda Clark",
+    senderEmail: "sender@example.com",
+  },
+  {
+    id: "sent-2",
+    recipientEmail: "Support",
+    subject: "Issue with login",
+    snippet: "I am having trouble logging in to the dashboard...",
+    body: "Hi Support Team,\n\nI am having trouble logging in to the dashboard with my credentials. Could you please verify my access token?\n\nThanks,\nOliver",
+    status: "SENT",
+    date: "Nov 2, 4:15 PM",
+    starred: false,
+    senderName: "Oliver Brown",
+    senderEmail: "oliver.brown@domain.io",
+  },
+  {
+    id: "sent-3",
+    recipientEmail: "Alex Morgan",
+    subject: "Weekly Dispatch Report",
+    snippet: "All SMTP queues processed with zero bounce events.",
+    body: "Hi Alex,\n\nHere is the weekly dispatch performance overview. All automated emails were sent according to hourly limits.\n\nCheers,\nOliver",
+    status: "SENT",
+    date: "Nov 1, 9:00 AM",
+    starred: true,
+    senderName: "Oliver Brown",
+    senderEmail: "oliver.brown@domain.io",
+  },
+];
+
+const DEMO_SCHEDULED_EMAILS: EmailItem[] = [
+  {
+    id: "sched-1",
+    recipientEmail: "tame@jmail.com, lame@jmail.com (+4)",
+    subject: "Q4 Product Showcase & Release",
+    snippet: "Exclusive preview of our upcoming multi-channel dispatch pipeline...",
+    body: "Hey Team,\n\nJoin us tomorrow for an exclusive walkthrough of the new automated dispatch pipeline.\n\nBest,\nOliver",
+    status: "SCHEDULED",
+    date: "Tomorrow, 10:00 AM",
+    starred: false,
+    senderName: "Oliver Brown",
+    senderEmail: "oliver.brown@domain.io",
+  },
+  {
+    id: "sched-2",
+    recipientEmail: "dame@jmail.com",
+    subject: "Follow up: API Integration Consultation",
+    snippet: "Sharing the technical documentation and webhook specifications...",
+    body: "Hi there,\n\nFollowing up on our call regarding the rate-limiter service and webhook integration.\n\nRegards,\nOliver",
+    status: "SCHEDULED",
+    date: "Tomorrow, 3:00 PM",
+    starred: true,
+    senderName: "Oliver Brown",
+    senderEmail: "oliver.brown@domain.io",
+  },
+];
+
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
-  const [dbStatus, setDbStatus] = useState<string>("checking...");
-  const [isCheckingDb, setIsCheckingDb] = useState(false);
 
-  // Senders state
+  // Navigation tabs: 'sent' | 'scheduled' | 'senders' | 'slack'
+  const [activeTab, setActiveTab] = useState<"sent" | "scheduled" | "senders" | "slack">("sent");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Real data state
   const [senders, setSenders] = useState<Sender[]>([]);
   const [isLoadingSenders, setIsLoadingSenders] = useState(true);
+  const [dbStatus, setDbStatus] = useState<string>("checking...");
 
-  // Slack connection state
-  const [slackStatus, setSlackStatus] = useState<{
-    connected: boolean;
-    teamName?: string | null;
-    teamId?: string | null;
-  } | null>(null);
+  const [realEmails, setRealEmails] = useState<EmailItem[]>([]);
+  const [isLoadingEmails, setIsLoadingEmails] = useState(false);
+  const [scheduledCount, setScheduledCount] = useState<number>(12);
+  const [sentCount, setSentCount] = useState<number>(785);
 
-  const handleSlackStatusChange = useCallback(
-    (status: { connected: boolean; teamName?: string | null; teamId?: string | null }) => {
-      setSlackStatus((prev) => {
-        if (
-          prev?.connected === status.connected &&
-          prev?.teamName === status.teamName &&
-          prev?.teamId === status.teamId
-        ) {
-          return prev;
-        }
-        return {
-          connected: status.connected,
-          teamName: status.teamName,
-          teamId: status.teamId,
-        };
-      });
-    },
-    []
-  );
-
-  // Modal & form state (transient only — never stored in persistent storage)
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Modals & Popovers
   const [isComposeOpen, setIsComposeOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
 
-  const [formData, setFormData] = useState({
+  // Senders Modal Form State
+  const [isSenderModalOpen, setIsSenderModalOpen] = useState(false);
+  const [isSubmittingSender, setIsSubmittingSender] = useState(false);
+  const [senderSubmitError, setSenderSubmitError] = useState<string | null>(null);
+  const [senderSubmitSuccess, setSenderSubmitSuccess] = useState<string | null>(null);
+  const [senderFormData, setSenderFormData] = useState({
     name: "",
     email: "",
     smtpHost: "smtp.ethereal.email",
@@ -84,6 +152,13 @@ export const DashboardPage: React.FC = () => {
     smtpUser: "",
     smtpPassword: "",
   });
+
+  // Slack Connection State
+  const [slackStatus, setSlackStatus] = useState<{
+    connected: boolean;
+    teamName?: string | null;
+    teamId?: string | null;
+  } | null>(null);
 
   const getAuthHeaders = (): Record<string, string> => {
     const token = localStorage.getItem("auth_token");
@@ -94,19 +169,14 @@ export const DashboardPage: React.FC = () => {
   };
 
   const checkDb = async () => {
-    setIsCheckingDb(true);
     try {
       const res = await fetch("http://localhost:5000/health/db");
       if (res.ok) {
         const data = await res.json();
         setDbStatus(data.database === "connected" ? "Connected" : "Disconnected");
-      } else {
-        setDbStatus("Disconnected");
       }
     } catch {
       setDbStatus("Unreachable");
-    } finally {
-      setIsCheckingDb(false);
     }
   };
 
@@ -117,25 +187,89 @@ export const DashboardPage: React.FC = () => {
         headers: getAuthHeaders(),
         credentials: "include",
       });
-
       if (res.ok) {
         const data = await res.json();
         setSenders(data.senders || []);
       }
-    } catch (error) {
-      console.error("Failed to load senders:", error);
+    } catch (err) {
+      console.warn("Failed to load senders:", err);
     } finally {
       setIsLoadingSenders(false);
     }
   }, []);
+
+  const fetchEmails = useCallback(async () => {
+    try {
+      setIsLoadingEmails(true);
+      const statusParam = activeTab === "scheduled" ? "SCHEDULED" : "SENT";
+      const qParam = searchQuery.trim() ? `&q=${encodeURIComponent(searchQuery.trim())}` : "";
+      const res = await fetch(`http://localhost:5000/api/emails?status=${statusParam}${qParam}`, {
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.emails && data.emails.length > 0) {
+          const mapped: EmailItem[] = data.emails.map((e: any) => ({
+            id: e.id,
+            recipientEmail: e.recipientEmail,
+            subject: e.subject,
+            snippet: e.body ? e.body.replace(/<[^>]+>/g, "").slice(0, 75) + "..." : "No preview available",
+            body: e.body || "",
+            status: e.status,
+            date: e.sentAt
+              ? new Date(e.sentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+              : e.scheduledAt
+              ? new Date(e.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+              : "Recently",
+            starred: false,
+          }));
+          setRealEmails(mapped);
+          if (activeTab === "scheduled") setScheduledCount(data.total || mapped.length);
+          if (activeTab === "sent") setSentCount(data.total || mapped.length);
+        } else {
+          setRealEmails([]);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch emails:", err);
+    } finally {
+      setIsLoadingEmails(false);
+    }
+  }, [activeTab, searchQuery]);
 
   useEffect(() => {
     checkDb();
     fetchSenders();
   }, [fetchSenders]);
 
-  const handleOpenModal = (prefillEmail?: string, prefillName?: string) => {
-    setFormData({
+  useEffect(() => {
+    if (activeTab === "scheduled" || activeTab === "sent") {
+      fetchEmails();
+    }
+  }, [activeTab, fetchEmails]);
+
+  // Compute displayed list: use real API emails if present, else fallback to Figma demo emails
+  const displayedEmails = useMemo(() => {
+    let source = realEmails;
+    if (source.length === 0 && !searchQuery) {
+      source = activeTab === "scheduled" ? DEMO_SCHEDULED_EMAILS : DEMO_SENT_EMAILS;
+    }
+
+    if (!searchQuery.trim()) return source;
+
+    const q = searchQuery.toLowerCase();
+    return source.filter(
+      (e) =>
+        e.recipientEmail.toLowerCase().includes(q) ||
+        e.subject.toLowerCase().includes(q) ||
+        (e.snippet && e.snippet.toLowerCase().includes(q))
+    );
+  }, [realEmails, activeTab, searchQuery]);
+
+  const handleOpenSenderModal = (prefillEmail?: string, prefillName?: string) => {
+    setSenderFormData({
       name: prefillName || user?.name || "",
       email: prefillEmail || "",
       smtpHost: "smtp.ethereal.email",
@@ -143,32 +277,16 @@ export const DashboardPage: React.FC = () => {
       smtpUser: prefillEmail || "",
       smtpPassword: "",
     });
-    setSubmitError(null);
-    setSubmitSuccess(null);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    if (isSubmitting) return;
-    // Wipe transient state
-    setFormData({
-      name: "",
-      email: "",
-      smtpHost: "smtp.ethereal.email",
-      smtpPort: "587",
-      smtpUser: "",
-      smtpPassword: "",
-    });
-    setSubmitError(null);
-    setSubmitSuccess(null);
-    setIsModalOpen(false);
+    setSenderSubmitError(null);
+    setSenderSubmitSuccess(null);
+    setIsSenderModalOpen(true);
   };
 
   const handleAddSenderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitError(null);
-    setSubmitSuccess(null);
+    setIsSubmittingSender(true);
+    setSenderSubmitError(null);
+    setSenderSubmitSuccess(null);
 
     try {
       const res = await fetch("http://localhost:5000/api/senders", {
@@ -176,554 +294,773 @@ export const DashboardPage: React.FC = () => {
         headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify({
-          name: formData.name.trim() || undefined,
-          email: formData.email.trim(),
-          smtpHost: formData.smtpHost.trim(),
-          smtpPort: Number(formData.smtpPort),
-          smtpUser: formData.smtpUser.trim(),
-          smtpPassword: formData.smtpPassword,
+          name: senderFormData.name.trim() || undefined,
+          email: senderFormData.email.trim(),
+          smtpHost: senderFormData.smtpHost.trim(),
+          smtpPort: Number(senderFormData.smtpPort),
+          smtpUser: senderFormData.smtpUser.trim(),
+          smtpPassword: senderFormData.smtpPassword,
         }),
       });
 
       const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(
-          data.message || "Failed to configure sender. Check your SMTP credentials."
-        );
+        throw new Error(data.message || "Failed to configure sender. Check SMTP credentials.");
       }
 
-      setSubmitSuccess("Sender configured and SMTP verified successfully!");
-
-      // Clear password and form
-      setFormData({
-        name: "",
-        email: "",
-        smtpHost: "smtp.ethereal.email",
-        smtpPort: "587",
-        smtpUser: "",
-        smtpPassword: "",
-      });
-
-      // Refresh list
+      setSenderSubmitSuccess("Sender configured and SMTP verified successfully!");
       await fetchSenders();
-
-      // Automatically close modal on success
       setTimeout(() => {
-        setIsModalOpen(false);
-        setSubmitSuccess(null);
+        setIsSenderModalOpen(false);
+        setSenderSubmitSuccess(null);
       }, 1200);
     } catch (err: any) {
-      setSubmitError(err.message || "Unable to configure sender. Check your SMTP credentials.");
+      setSenderSubmitError(err.message || "Unable to configure sender.");
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingSender(false);
     }
   };
 
-  // Senders metrics calculation
-  const activeSenders = senders.filter((s) => s.isActive && s.smtpHost);
-  const activeCount = activeSenders.length;
+  const activeSendersCount = senders.filter((s) => s.isActive && s.smtpHost).length;
 
   return (
-    <div className="dashboard-container">
-      {/* Top Navbar */}
-      <header className="dashboard-navbar">
-        <div className="navbar-left">
-          <div className="brand-logo">
-            <div className="logo-icon-wrapper">
-              <Mail className="logo-icon" size={20} />
-            </div>
-            <div className="brand-text">
-              <span className="brand-title">MailFlow</span>
-              <span className="brand-badge">Console</span>
-            </div>
-          </div>
+    <div className="flex min-h-screen bg-white text-gray-900 font-sans antialiased overflow-x-hidden">
+      {/* 1. Left Sidebar (Figma Screenshot 5) */}
+      <aside className="w-60 flex-shrink-0 bg-white border-r border-gray-100 p-5 flex flex-col min-h-screen">
+        {/* Top Logo */}
+        <div className="mb-6 pl-1">
+          <span className="text-3xl font-black tracking-tighter text-black leading-none select-none">
+            ONG
+          </span>
         </div>
 
-        <div className="navbar-right">
-          {/* User Profile Pill */}
-          <div className="user-profile-badge">
-            {user?.avatar ? (
-              <img
-                src={user.avatar}
-                alt={user.name}
-                className="user-avatar-img"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = "none";
-                }}
-              />
-            ) : (
-              <div className="user-avatar-fallback">
-                {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
-              </div>
-            )}
-            <div className="user-profile-info">
-              <span className="user-profile-name">{user?.name || "Authenticated User"}</span>
-              <span className="user-profile-email">{user?.email}</span>
-            </div>
-          </div>
-
-          {/* Slack Connection Status Pill in Navbar */}
-          <div
-            id="nav-slack-status"
-            className={`nav-slack-pill ${slackStatus?.connected ? "connected" : "disconnected"}`}
-            title={
-              slackStatus?.connected
-                ? `Connected to Slack: ${slackStatus.teamName || slackStatus.teamId}`
-                : "Slack not connected"
-            }
-          >
-            <span className={slackStatus?.connected ? "slack-dot-active" : "slack-dot-inactive"} />
-            <span className="nav-slack-text">
-              {slackStatus?.connected
-                ? (slackStatus.teamName ? `Slack: ${slackStatus.teamName}` : "Slack: Connected")
-                : "Slack: Disconnected"}
-            </span>
-          </div>
-
+        {/* User Profile Pill Card */}
+        <div className="relative mb-4">
           <button
-            id="nav-compose-btn"
-            onClick={() => setIsComposeOpen(true)}
-            className="nav-compose-btn"
-            title="Compose New Email"
+            type="button"
+            className="w-full flex items-center gap-2.5 bg-gray-50 border border-gray-100 hover:border-gray-200 hover:bg-gray-100/80 rounded-xl p-2 cursor-pointer transition text-left"
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
           >
-            <Send size={14} />
-            <span>Compose</span>
+            <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user.name || "User"}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = "none";
+                  }}
+                />
+              ) : (
+                <span>{user?.name ? user.name.charAt(0).toUpperCase() : "O"}</span>
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0 flex flex-col">
+              <span className="text-[13px] font-semibold text-gray-900 truncate leading-tight">
+                {user?.name || "Oliver Brown"}
+              </span>
+              <span className="text-[11px] text-gray-400 truncate leading-tight">
+                {user?.email || "oliver.brown@domain.io"}
+              </span>
+            </div>
+
+            <ChevronDown size={14} className="text-gray-400 flex-shrink-0 ml-auto" />
           </button>
 
-          <button id="logout-btn" onClick={logout} className="logout-btn" title="Sign out">
-            <LogOut size={16} />
-            <span>Sign Out</span>
+          {/* User Menu Dropdown */}
+          {isUserMenuOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-50 animate-fade-in">
+              <div className="flex flex-col gap-0.5 text-xs pb-2 border-b border-gray-100">
+                <strong className="text-sm text-gray-900">{user?.name || "User"}</strong>
+                <span className="text-gray-400 truncate">{user?.email}</span>
+                <div className="inline-flex items-center gap-1.5 mt-1.5 text-[11px] text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md w-fit">
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      dbStatus === "Connected" ? "bg-emerald-500" : "bg-red-500"
+                    }`}
+                  />
+                  <span>DB: {dbStatus}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-2 py-2 mt-1 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 transition cursor-pointer"
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  logout();
+                }}
+              >
+                <LogOut size={13} />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Compose Button (Figma Screenshot 5) */}
+        <div className="mb-7">
+          <button
+            type="button"
+            id="sidebar-compose-btn"
+            className="w-full py-2.5 rounded-full bg-white border-2 border-emerald-500 text-emerald-600 font-semibold text-sm hover:bg-emerald-50 hover:border-emerald-600 transition text-center shadow-xs cursor-pointer"
+            onClick={() => setIsComposeOpen(true)}
+          >
+            Compose
           </button>
         </div>
-      </header>
 
-      {/* Main Dashboard Layout */}
-      <main className="dashboard-content">
-        {/* Welcome Banner */}
-        <section className="welcome-banner">
-          <div className="welcome-text">
-            <div className="welcome-pill">
-              <Sparkles size={14} className="sparkle-icon" />
-              <span>OAuth 2.0 Handshake Complete</span>
-            </div>
-            <h1>
-              Welcome back, <span className="gradient-text">{user?.name || "User"}</span>!
-            </h1>
-            <p>
-              Your Google credentials have been verified and your profile is securely synchronized with PostgreSQL.
-              Configure an SMTP sender below to begin scheduling automated emails.
-            </p>
-          </div>
+        {/* Navigation Section: CORE */}
+        <div className="flex flex-col">
+          <span className="text-[11px] font-bold text-gray-400 tracking-wider uppercase mb-2 pl-1.5">
+            CORE
+          </span>
 
-          <div className="auth-verification-card">
-            <div className="verification-header">
-              <CheckCircle2 size={20} className="check-icon" />
-              <div>
-                <h3>Database State: Verified</h3>
-                <p>Saved in PostgreSQL <code>User</code> table</p>
+          <nav className="flex flex-col gap-1">
+            {/* Scheduled */}
+            <button
+              type="button"
+              id="nav-tab-scheduled"
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition text-left cursor-pointer ${
+                activeTab === "scheduled"
+                  ? "bg-emerald-50 text-emerald-800 font-semibold"
+                  : "text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900"
+              }`}
+              onClick={() => {
+                setActiveTab("scheduled");
+                setSelectedEmail(null);
+              }}
+            >
+              <div className="flex items-center gap-2.5">
+                <Clock size={16} className="flex-shrink-0" />
+                <span>Scheduled</span>
+              </div>
+              <span
+                className={`text-xs ${
+                  activeTab === "scheduled" ? "text-emerald-700 font-semibold" : "text-gray-400 font-normal"
+                }`}
+              >
+                {scheduledCount}
+              </span>
+            </button>
+
+            {/* Sent */}
+            <button
+              type="button"
+              id="nav-tab-sent"
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition text-left cursor-pointer ${
+                activeTab === "sent"
+                  ? "bg-emerald-50 text-emerald-800 font-semibold"
+                  : "text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900"
+              }`}
+              onClick={() => {
+                setActiveTab("sent");
+                setSelectedEmail(null);
+              }}
+            >
+              <div className="flex items-center gap-2.5">
+                <Send size={16} className="flex-shrink-0" />
+                <span>Sent</span>
+              </div>
+              <span
+                className={`text-xs ${
+                  activeTab === "sent" ? "text-emerald-700 font-semibold" : "text-gray-400 font-normal"
+                }`}
+              >
+                {sentCount}
+              </span>
+            </button>
+          </nav>
+        </div>
+
+        {/* Navigation Section: MANAGEMENT */}
+        <div className="flex flex-col mt-6">
+          <span className="text-[11px] font-bold text-gray-400 tracking-wider uppercase mb-2 pl-1.5">
+            MANAGEMENT
+          </span>
+
+          <nav className="flex flex-col gap-1">
+            {/* Senders */}
+            <button
+              type="button"
+              id="nav-tab-senders"
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition text-left cursor-pointer ${
+                activeTab === "senders"
+                  ? "bg-emerald-50 text-emerald-800 font-semibold"
+                  : "text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900"
+              }`}
+              onClick={() => {
+                setActiveTab("senders");
+                setSelectedEmail(null);
+              }}
+            >
+              <div className="flex items-center gap-2.5">
+                <Users size={16} className="flex-shrink-0" />
+                <span>Senders</span>
+              </div>
+              <span
+                className={`text-xs ${
+                  activeTab === "senders" ? "text-emerald-700 font-semibold" : "text-gray-400 font-normal"
+                }`}
+              >
+                {activeSendersCount}
+              </span>
+            </button>
+
+            {/* Slack Alerts */}
+            <button
+              type="button"
+              id="nav-tab-slack"
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition text-left cursor-pointer ${
+                activeTab === "slack"
+                  ? "bg-emerald-50 text-emerald-800 font-semibold"
+                  : "text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900"
+              }`}
+              onClick={() => {
+                setActiveTab("slack");
+                setSelectedEmail(null);
+              }}
+            >
+              <div className="flex items-center gap-2.5">
+                <MessageSquare size={16} className="flex-shrink-0" />
+                <span>Slack Alerts</span>
+              </div>
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  slackStatus?.connected ? "bg-emerald-500 shadow-[0_0_6px_#10b981]" : "bg-gray-300"
+                }`}
+              />
+            </button>
+          </nav>
+        </div>
+      </aside>
+
+      {/* 2. Main Content Area */}
+      <main className="flex-1 min-w-0 bg-white flex flex-col px-8 py-6 overflow-y-auto">
+        {/* If an email is selected, display Email Detail View (Screenshot 4) */}
+        {selectedEmail ? (
+          <div className="w-full max-w-3xl animate-fade-in">
+            {/* Detail View Header */}
+            <div className="flex items-center justify-between pb-3.5 mb-5 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-md transition cursor-pointer"
+                  onClick={() => setSelectedEmail(null)}
+                  title="Back to list"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <h3 className="text-lg font-bold text-gray-900 m-0">
+                  {selectedEmail.subject}{" "}
+                  <span className="font-normal text-gray-400 text-sm">| MJWYT44 BM#52W01</span>
+                </h3>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="p-1.5 text-gray-500 hover:text-amber-500 hover:bg-gray-100 rounded-md transition cursor-pointer"
+                  title="Star"
+                >
+                  <Star size={17} />
+                </button>
+                <button
+                  type="button"
+                  className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
+                  title="Archive"
+                >
+                  <Archive size={17} />
+                </button>
+                <button
+                  type="button"
+                  className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-md transition cursor-pointer"
+                  title="Delete"
+                >
+                  <Trash2 size={17} />
+                </button>
+                <div className="w-7 h-7 rounded-full overflow-hidden ml-1.5 bg-gray-200">
+                  <img
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+                    alt="User"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
               </div>
             </div>
-            <div className="verification-details">
-              <div className="detail-row">
-                <span className="detail-label">Database ID</span>
-                <span className="detail-val mono-text">{user?.id}</span>
+
+            {/* Sender and Recipient Row */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-full bg-emerald-500 text-white font-bold text-base flex items-center justify-center flex-shrink-0">
+                A
               </div>
-              <div className="detail-row">
-                <span className="detail-label">Google Sub ID</span>
-                <span className="detail-val mono-text">{user?.googleId}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Auth Provider</span>
-                <span className="detail-val badge-provider">Google OAuth 2.0</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">PostgreSQL</span>
-                <div className="db-badge-container">
-                  <span
-                    className={`status-pill ${
-                      dbStatus === "Connected" ? "status-online" : "status-offline"
-                    }`}
-                  >
-                    {dbStatus}
+              <div className="flex flex-col flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-gray-900">
+                    {selectedEmail.senderName || "Amanda Clark"}
                   </span>
-                  <button
-                    onClick={checkDb}
-                    className="icon-btn-tiny"
-                    disabled={isCheckingDb}
-                    title="Refresh DB status"
-                  >
-                    <RefreshCw size={12} className={isCheckingDb ? "spin" : ""} />
-                  </button>
+                  <span className="text-xs text-gray-400">
+                    &lt;{selectedEmail.senderEmail || "sender@example.com"}&gt;
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-gray-500">
+                  <span>to me</span>
+                  <ChevronDown size={12} />
+                </div>
+              </div>
+              <span className="text-xs text-gray-400">{selectedEmail.date || "Nov 3, 10:23 AM"}</span>
+            </div>
+
+            {/* Email Body Content */}
+            <div className="text-sm leading-relaxed text-gray-800">
+              <p className="mb-4">Hey Oliver,</p>
+              <p className="mb-4">You've just RECEIVED something</p>
+
+              <div className="bg-amber-50/80 border-l-4 border-amber-500 p-4 rounded-md my-5 text-amber-950">
+                <p className="font-bold mb-1">
+                  ⚡ Extremely Exclusive—Only 4 Spots Worldwide Per Year | $25,000 investment ⚡
+                </p>
+                <p className="text-xs text-amber-900 m-0">
+                  To explore securing your private transformation, simply reply right now with{" "}
+                  <strong>"FLY OUT FIX"</strong>.
+                </p>
+              </div>
+
+              <p className="mb-4">Your coach for world-class performance,</p>
+              <p className="mb-4">Grant</p>
+
+              <p className="mt-5 text-gray-600 italic">
+                P.S. Always remember that you can develop world class technique! 🚀
+              </p>
+
+              {/* Attachments Cards in Detail View */}
+              <div className="flex gap-3.5 mt-6 flex-wrap">
+                <div className="w-44 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+                  <div className="w-full h-24 bg-sky-600 overflow-hidden">
+                    <img
+                      src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=300&auto=format&fit=crop&q=80"
+                      alt="Tennis_Coach_Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="p-2 flex flex-col">
+                    <span className="text-xs font-semibold text-gray-900 truncate">
+                      Tennis_Coach_Profile.png
+                    </span>
+                    <span className="text-[11px] text-gray-400">1.2 MB</span>
+                  </div>
+                </div>
+
+                <div className="w-44 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+                  <div className="w-full h-24 bg-sky-600 overflow-hidden">
+                    <img
+                      src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=300&auto=format&fit=crop&q=80"
+                      alt="Tennis_Coach_Profile2"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="p-2 flex flex-col">
+                    <span className="text-xs font-semibold text-gray-900 truncate">
+                      Tennis_Coach_Profile2.png
+                    </span>
+                    <span className="text-[11px] text-gray-400">1.2 MB</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </section>
+        ) : (
+          <>
+            {/* Top Search & Action Bar (Figma Screenshot 5) */}
+            <div className="flex items-center gap-3.5 mb-6">
+              <div className="relative flex-1 max-w-2xl">
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  id="dashboard-search-input"
+                  className="w-full h-10 bg-gray-100/90 border border-transparent focus:border-gray-300 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 rounded-full pl-11 pr-5 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
 
-        {/* Analytics & Metrics Grid */}
-        <section className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <span className="stat-title">Active Senders</span>
-              <div className="stat-icon-wrapper purple">
-                <Users size={18} />
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                  title="Filter"
+                  onClick={() => alert("Filter applied")}
+                >
+                  <Filter size={17} />
+                </button>
+                <button
+                  type="button"
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                  title="Refresh"
+                  onClick={() => {
+                    fetchEmails();
+                    fetchSenders();
+                  }}
+                >
+                  <RotateCw size={17} className={isLoadingEmails ? "animate-spin" : ""} />
+                </button>
               </div>
             </div>
-            <div className="stat-value">{activeCount}</div>
-            <div className="stat-subtext">
-              {activeCount > 0 ? (
-                <span className="highlight-text">{activeCount} configured with SMTP</span>
-              ) : (
-                <span>No active SMTP senders</span>
-              )}
-            </div>
-          </div>
 
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <span className="stat-title">Queued Emails</span>
-              <div className="stat-icon-wrapper cyan">
-                <Clock size={18} />
-              </div>
-            </div>
-            <div className="stat-value">0</div>
-            <div className="stat-subtext">BullMQ queue idle</div>
-          </div>
+            {/* Tab: Scheduled or Sent Emails List (Figma Screenshot 5) */}
+            {(activeTab === "scheduled" || activeTab === "sent") && (
+              <div className="w-full animate-fade-in">
+                {isLoadingEmails ? (
+                  <div className="flex items-center justify-center gap-3 py-16 text-gray-400 text-sm">
+                    <Loader2 size={22} className="animate-spin text-emerald-500" />
+                    <span>Loading emails...</span>
+                  </div>
+                ) : displayedEmails.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center text-center py-20 text-gray-500">
+                    <Mail size={36} className="text-gray-300 mb-3" />
+                    <h4 className="text-base font-semibold text-gray-800 mb-1">
+                      No {activeTab} emails found
+                    </h4>
+                    <p className="text-xs text-gray-400 max-w-sm mb-4">
+                      {searchQuery
+                        ? `No results match "${searchQuery}"`
+                        : `Your ${activeTab} mailbox is currently empty. Click Compose to schedule an email.`}
+                    </p>
+                    <button
+                      type="button"
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-full text-xs font-semibold hover:bg-emerald-700 transition cursor-pointer shadow-xs"
+                      onClick={() => setIsComposeOpen(true)}
+                    >
+                      Compose Email
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-full flex flex-col">
+                    {displayedEmails.map((email) => (
+                      <div
+                        key={email.id}
+                        className="flex items-center px-4 py-3 border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer gap-4 rounded-lg"
+                        onClick={() => setSelectedEmail(email)}
+                      >
+                        {/* Recipient */}
+                        <div className="w-44 flex-shrink-0 font-semibold text-sm text-gray-900 truncate">
+                          <span>To: {email.recipientEmail}</span>
+                        </div>
 
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <span className="stat-title">Sent Today</span>
-              <div className="stat-icon-wrapper emerald">
-                <Send size={18} />
-              </div>
-            </div>
-            <div className="stat-value">0</div>
-            <div className="stat-subtext">Ready for first campaign</div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <span className="stat-title">SMTP Transport</span>
-              <div className="stat-icon-wrapper blue">
-                <Shield size={18} />
-              </div>
-            </div>
-            <div className="stat-value">{activeCount > 0 ? "Ready" : "Pending"}</div>
-            <div className="stat-subtext">
-              {activeCount > 0 ? "Verified SMTP credentials" : "SMTP configuration required"}
-            </div>
-          </div>
-        </section>
-
-        {/* Slack Workspace Integration Section */}
-        <section className="integrations-section">
-          <SlackConnectionCard onStatusChange={handleSlackStatusChange} />
-        </section>
-
-        {/* Sender & Pipeline Section */}
-        <section className="pipeline-section">
-          <div className="section-header">
-            <div>
-              <h2>Configured Senders</h2>
-              <p>Email accounts linked with verified SMTP credentials for dispatch</p>
-            </div>
-            <div className="section-header-actions">
-              <button
-                id="add-sender-btn"
-                className="secondary-action-btn"
-                onClick={() => handleOpenModal()}
-              >
-                <Plus size={16} />
-                <span>Add Sender</span>
-              </button>
-              <button
-                id="compose-email-btn"
-                className="primary-action-btn"
-                onClick={() => setIsComposeOpen(true)}
-              >
-                <Send size={16} />
-                <span>Compose New Email</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="sender-table-wrapper">
-            {isLoadingSenders ? (
-              <div className="table-loading-container">
-                <Loader2 size={24} className="spin" />
-                <span>Loading configured senders...</span>
-              </div>
-            ) : (
-              <table className="sender-table">
-                <thead>
-                  <tr>
-                    <th>Sender Name</th>
-                    <th>Email Address</th>
-                    <th>SMTP Host</th>
-                    <th>Status</th>
-                    <th>Rate Limit</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {senders.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="empty-table-cell">
-                        <div className="empty-state-box">
-                          <Mail size={32} className="empty-state-icon" />
-                          <h4>No Senders Configured</h4>
-                          <p>
-                            Configure an Ethereal or custom SMTP account to send automated emails.
-                          </p>
-                          <button
-                            className="secondary-action-btn"
-                            onClick={() => handleOpenModal()}
+                        {/* Status Badge */}
+                        <div className="flex-shrink-0">
+                          <span
+                            className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                              email.status === "SENT"
+                                ? "bg-gray-100 text-gray-600"
+                                : "bg-emerald-100 text-emerald-800"
+                            }`}
                           >
-                            <Plus size={15} />
-                            <span>Add Sender Now</span>
+                            {email.status === "SENT" ? "Sent" : "Scheduled"}
+                          </span>
+                        </div>
+
+                        {/* Subject & Preview */}
+                        <div className="flex-1 min-w-0 flex items-center gap-1.5 truncate text-[13.5px]">
+                          <span className="font-semibold text-gray-900 flex-shrink-0">
+                            {email.subject}
+                          </span>
+                          {email.snippet && (
+                            <span className="text-gray-500 truncate">- {email.snippet}</span>
+                          )}
+                        </div>
+
+                        {/* Right: Star */}
+                        <div
+                          className="flex items-center gap-3 flex-shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className={`p-1 text-gray-300 hover:text-amber-400 transition cursor-pointer ${
+                              email.starred ? "text-amber-400" : ""
+                            }`}
+                            title="Star email"
+                          >
+                            <Star size={16} fill={email.starred ? "#f59e0b" : "none"} />
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    senders.map((s) => {
-                      const isConfigured = s.isActive && Boolean(s.smtpHost);
-
-                      return (
-                        <tr key={s.id}>
-                          <td className="sender-cell-name">
-                            <div className="table-avatar">
-                              {s.name ? s.name.charAt(0).toUpperCase() : s.email.charAt(0).toUpperCase()}
-                            </div>
-                            <span>{s.name || "Default Sender"}</span>
-                          </td>
-                          <td className="mono-text">{s.email}</td>
-                          <td className="mono-text">
-                            {s.smtpHost ? `${s.smtpHost}:${s.smtpPort || 587}` : "Not Configured"}
-                          </td>
-                          <td>
-                            {isConfigured ? (
-                              <span className="badge-active">
-                                <CheckCircle2 size={12} /> Active
-                              </span>
-                            ) : (
-                              <span className="badge-unconfigured">
-                                <AlertTriangle size={12} /> Unconfigured
-                              </span>
-                            )}
-                          </td>
-                          <td>{isConfigured ? "50 emails / hr" : "—"}</td>
-                          <td>
-                            {isConfigured ? (
-                              <button className="link-action-btn" onClick={() => handleOpenModal(s.email, s.name || "")}>
-                                <span>Reconfigure</span>
-                                <ArrowRight size={13} />
-                              </button>
-                            ) : (
-                              <button
-                                className="action-btn-pill"
-                                onClick={() => handleOpenModal(s.email, s.name || "")}
-                              >
-                                <span>Configure SMTP</span>
-                                <ArrowRight size={13} />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
-          </div>
-        </section>
+
+            {/* Tab: Senders Management */}
+            {activeTab === "senders" && (
+              <div className="w-full max-w-4xl animate-fade-in">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 m-0">Configured Senders</h3>
+                    <p className="text-xs text-gray-500 m-0 mt-1">
+                      Link and verify SMTP accounts for automated campaign dispatches
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    id="add-sender-btn"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-full inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    onClick={() => handleOpenSenderModal()}
+                  >
+                    <Plus size={15} />
+                    <span>Add Sender</span>
+                  </button>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-xs">
+                  {isLoadingSenders ? (
+                    <div className="flex items-center justify-center gap-3 py-12 text-gray-400 text-sm">
+                      <Loader2 size={22} className="animate-spin text-emerald-500" />
+                      <span>Loading senders...</span>
+                    </div>
+                  ) : senders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-center py-12 text-gray-500">
+                      <Server size={36} className="text-gray-300 mb-3" />
+                      <h4 className="text-sm font-semibold text-gray-800 mb-1">
+                        No Senders Configured
+                      </h4>
+                      <p className="text-xs text-gray-400 max-w-sm mb-4">
+                        Add your SMTP credentials (e.g. Ethereal, Gmail, Sendgrid) to start scheduling campaigns.
+                      </p>
+                      <button
+                        type="button"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-full inline-flex items-center gap-1.5 transition cursor-pointer"
+                        onClick={() => handleOpenSenderModal()}
+                      >
+                        <Plus size={15} />
+                        <span>Add Sender Now</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left text-sm border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                          <th className="pb-3 px-3">Sender Name</th>
+                          <th className="pb-3 px-3">Email Address</th>
+                          <th className="pb-3 px-3">SMTP Host</th>
+                          <th className="pb-3 px-3">Status</th>
+                          <th className="pb-3 px-3">Rate Limit</th>
+                          <th className="pb-3 px-3">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {senders.map((s) => {
+                          const isConfigured = s.isActive && Boolean(s.smtpHost);
+                          return (
+                            <tr key={s.id} className="border-b border-gray-100 hover:bg-gray-50/70">
+                              <td className="py-3.5 px-3 font-semibold text-gray-900">
+                                {s.name || "Default Sender"}
+                              </td>
+                              <td className="py-3.5 px-3 text-gray-500 font-mono text-xs">{s.email}</td>
+                              <td className="py-3.5 px-3 text-gray-500 font-mono text-xs">
+                                {s.smtpHost ? `${s.smtpHost}:${s.smtpPort || 587}` : "Unconfigured"}
+                              </td>
+                              <td className="py-3.5 px-3">
+                                {isConfigured ? (
+                                  <span className="bg-emerald-50 text-emerald-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
+                                    Active
+                                  </span>
+                                ) : (
+                                  <span className="bg-gray-100 text-gray-600 text-[11px] font-semibold px-2 py-0.5 rounded-full">
+                                    Pending
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-3 text-xs text-gray-500">
+                                {isConfigured ? "50 / hr" : "—"}
+                              </td>
+                              <td className="py-3.5 px-3">
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-emerald-600 hover:underline cursor-pointer"
+                                  onClick={() => handleOpenSenderModal(s.email, s.name || "")}
+                                >
+                                  Configure
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Slack Alerts Integration */}
+            {activeTab === "slack" && (
+              <div className="w-full max-w-4xl animate-fade-in">
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold text-gray-900 m-0">Slack Integration & Notifications</h3>
+                  <p className="text-xs text-gray-500 m-0 mt-1">
+                    Manage workspace authorization, alert channels, and test notifications
+                  </p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-xs">
+                  <SlackConnectionCard
+                    onStatusChange={(st) =>
+                      setSlackStatus({
+                        connected: st.connected,
+                        teamName: st.teamName,
+                        teamId: st.teamId,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </main>
 
       {/* Add / Configure Sender Modal */}
-      {isModalOpen && (
-        <div className="modal-backdrop animate-fade-in" onClick={handleCloseModal}>
+      {isSenderModalOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in"
+          onClick={() => setIsSenderModalOpen(false)}
+        >
           <div
-            className="modal-container"
+            className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-gray-200 p-6"
             onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-title"
           >
-            <div className="modal-header">
-              <div className="modal-title-group">
-                <div className="modal-icon-badge">
-                  <Server size={18} />
-                </div>
-                <div>
-                  <h3 id="modal-title">Configure SMTP Sender</h3>
-                  <p>Credentials will be verified via SMTP before saving</p>
-                </div>
-              </div>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-bold text-gray-900 m-0">Configure SMTP Sender</h3>
               <button
                 type="button"
-                className="modal-close-btn"
-                onClick={handleCloseModal}
-                disabled={isSubmitting}
-                title="Close modal"
+                className="p-1 text-gray-400 hover:text-gray-700 cursor-pointer"
+                onClick={() => setIsSenderModalOpen(false)}
+                disabled={isSubmittingSender}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleAddSenderSubmit} className="modal-form">
-              {submitError && (
-                <div className="modal-alert-error">
-                  <AlertCircle size={18} className="alert-icon" />
-                  <div className="alert-text">
-                    <strong>SMTP Verification Failed</strong>
-                    <p>{submitError}</p>
-                  </div>
+            <form onSubmit={handleAddSenderSubmit} className="flex flex-col gap-4">
+              {senderSubmitError && (
+                <div className="flex items-center gap-2 p-3 rounded-lg text-xs bg-red-50 border border-red-200 text-red-700">
+                  <AlertCircle size={15} />
+                  <span>{senderSubmitError}</span>
+                </div>
+              )}
+              {senderSubmitSuccess && (
+                <div className="flex items-center gap-2 p-3 rounded-lg text-xs bg-emerald-50 border border-emerald-200 text-emerald-700">
+                  <CheckCircle2 size={15} />
+                  <span>{senderSubmitSuccess}</span>
                 </div>
               )}
 
-              {submitSuccess && (
-                <div className="modal-alert-success">
-                  <CheckCircle2 size={18} className="alert-icon" />
-                  <div className="alert-text">
-                    <strong>Success</strong>
-                    <p>{submitSuccess}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="modal-info-box">
-                <KeyRound size={16} />
-                <span>
-                  Passwords are encrypted with AES-256-GCM on the backend and are never stored in your browser storage.
-                </span>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="sender-name" className="form-label">
-                  Sender Display Name
-                </label>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-600">Sender Display Name</label>
                 <input
-                  id="sender-name"
                   type="text"
                   placeholder="e.g. Outreach Team"
-                  className="form-input"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  disabled={isSubmitting}
+                  className="w-full h-9 bg-gray-50 border border-gray-200 rounded-lg px-3 text-xs text-gray-900 outline-none focus:bg-white focus:border-emerald-500"
+                  value={senderFormData.name}
+                  onChange={(e) => setSenderFormData({ ...senderFormData, name: e.target.value })}
+                  disabled={isSubmittingSender}
                 />
               </div>
 
-              <div className="form-group">
-                <label htmlFor="sender-email" className="form-label">
-                  Sender Email Address <span className="required-star">*</span>
-                </label>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-600">Sender Email Address *</label>
                 <input
-                  id="sender-email"
                   type="email"
                   required
                   placeholder="e.g. test@ethereal.email"
-                  className="form-input"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  disabled={isSubmitting}
+                  className="w-full h-9 bg-gray-50 border border-gray-200 rounded-lg px-3 text-xs text-gray-900 outline-none focus:bg-white focus:border-emerald-500"
+                  value={senderFormData.email}
+                  onChange={(e) => setSenderFormData({ ...senderFormData, email: e.target.value })}
+                  disabled={isSubmittingSender}
                 />
               </div>
 
-              <div className="form-row">
-                <div className="form-group flex-2">
-                  <label htmlFor="smtp-host" className="form-label">
-                    SMTP Host <span className="required-star">*</span>
-                  </label>
+              <div className="flex gap-3">
+                <div className="flex-2 flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">SMTP Host *</label>
                   <input
-                    id="smtp-host"
                     type="text"
                     required
                     placeholder="smtp.ethereal.email"
-                    className="form-input"
-                    value={formData.smtpHost}
-                    onChange={(e) => setFormData({ ...formData, smtpHost: e.target.value })}
-                    disabled={isSubmitting}
+                    className="w-full h-9 bg-gray-50 border border-gray-200 rounded-lg px-3 text-xs text-gray-900 outline-none focus:bg-white focus:border-emerald-500"
+                    value={senderFormData.smtpHost}
+                    onChange={(e) => setSenderFormData({ ...senderFormData, smtpHost: e.target.value })}
+                    disabled={isSubmittingSender}
                   />
                 </div>
 
-                <div className="form-group flex-1">
-                  <label htmlFor="smtp-port" className="form-label">
-                    Port <span className="required-star">*</span>
-                  </label>
+                <div className="flex-1 flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">Port *</label>
                   <input
-                    id="smtp-port"
                     type="number"
                     required
                     placeholder="587"
-                    className="form-input"
-                    value={formData.smtpPort}
-                    onChange={(e) => setFormData({ ...formData, smtpPort: e.target.value })}
-                    disabled={isSubmitting}
+                    className="w-full h-9 bg-gray-50 border border-gray-200 rounded-lg px-3 text-xs text-gray-900 outline-none focus:bg-white focus:border-emerald-500"
+                    value={senderFormData.smtpPort}
+                    onChange={(e) => setSenderFormData({ ...senderFormData, smtpPort: e.target.value })}
+                    disabled={isSubmittingSender}
                   />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label htmlFor="smtp-user" className="form-label">
-                  SMTP Username <span className="required-star">*</span>
-                </label>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-600">SMTP Username *</label>
                 <input
-                  id="smtp-user"
                   type="text"
                   required
-                  placeholder="Ethereal or SMTP username"
-                  className="form-input"
-                  value={formData.smtpUser}
-                  onChange={(e) => setFormData({ ...formData, smtpUser: e.target.value })}
-                  disabled={isSubmitting}
-                  autoComplete="username"
+                  placeholder="Username"
+                  className="w-full h-9 bg-gray-50 border border-gray-200 rounded-lg px-3 text-xs text-gray-900 outline-none focus:bg-white focus:border-emerald-500"
+                  value={senderFormData.smtpUser}
+                  onChange={(e) => setSenderFormData({ ...senderFormData, smtpUser: e.target.value })}
+                  disabled={isSubmittingSender}
                 />
               </div>
 
-              <div className="form-group">
-                <label htmlFor="smtp-password" className="form-label">
-                  SMTP Password <span className="required-star">*</span>
-                </label>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-600">SMTP Password *</label>
                 <input
-                  id="smtp-password"
                   type="password"
                   required
                   placeholder="••••••••••••••••"
-                  className="form-input"
-                  value={formData.smtpPassword}
-                  onChange={(e) => setFormData({ ...formData, smtpPassword: e.target.value })}
-                  disabled={isSubmitting}
-                  autoComplete="new-password"
+                  className="w-full h-9 bg-gray-50 border border-gray-200 rounded-lg px-3 text-xs text-gray-900 outline-none focus:bg-white focus:border-emerald-500"
+                  value={senderFormData.smtpPassword}
+                  onChange={(e) => setSenderFormData({ ...senderFormData, smtpPassword: e.target.value })}
+                  disabled={isSubmittingSender}
                 />
               </div>
 
-              <div className="modal-footer">
+              <div className="flex items-center justify-end gap-2.5 mt-2">
                 <button
                   type="button"
-                  className="btn-cancel"
-                  onClick={handleCloseModal}
-                  disabled={isSubmitting}
+                  className="px-3.5 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 cursor-pointer"
+                  onClick={() => setIsSenderModalOpen(false)}
+                  disabled={isSubmittingSender}
                 >
                   Cancel
                 </button>
-
                 <button
                   type="submit"
-                  className="btn-submit"
-                  disabled={isSubmitting}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-full inline-flex items-center gap-1.5 transition cursor-pointer"
+                  disabled={isSubmittingSender}
                 >
-                  {isSubmitting ? (
+                  {isSubmittingSender ? (
                     <>
-                      <Loader2 size={16} className="spin" />
+                      <Loader2 size={14} className="animate-spin" />
                       <span>Verifying SMTP...</span>
                     </>
                   ) : (
-                    <>
-                      <CheckCircle2 size={16} />
-                      <span>Verify & Save Sender</span>
-                    </>
+                    <span>Verify & Save</span>
                   )}
                 </button>
               </div>
@@ -732,12 +1069,15 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Compose & Schedule Email Modal */}
+      {/* Compose & Schedule Email Modal (Figma Screenshots 1-3) */}
       <ComposeEmailModal
         isOpen={isComposeOpen}
         onClose={() => setIsComposeOpen(false)}
         senders={senders}
-        onScheduledSuccess={fetchSenders}
+        onScheduledSuccess={() => {
+          fetchEmails();
+          fetchSenders();
+        }}
       />
     </div>
   );

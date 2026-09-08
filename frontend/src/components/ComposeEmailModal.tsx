@@ -1,17 +1,27 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
-  X,
+  ArrowLeft,
+  Paperclip,
+  Clock,
   Send,
   Upload,
-  FileText,
-  Clock,
-  AlertCircle,
-  CheckCircle2,
-  Loader2,
-  Users,
-  Trash2,
   Calendar,
-  Layers,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Undo,
+  Redo,
+  Type,
+  Bold,
+  Italic,
+  Underline,
+  AlignLeft,
+  List,
+  Quote,
+  Code,
+  Strikethrough,
+  ChevronDown,
 } from "lucide-react";
 
 export interface Sender {
@@ -63,16 +73,21 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
   const [senderId, setSenderId] = useState<string>("");
   const [subject, setSubject] = useState<string>("");
   const [body, setBody] = useState<string>("");
-  const [manualInput, setManualInput] = useState<string>("");
-  const [uploadedEmails, setUploadedEmails] = useState<string[]>([]);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [recipientInput, setRecipientInput] = useState<string>("");
+  const [recipientsList, setRecipientsList] = useState<string[]>([]);
   const [startTime, setStartTime] = useState<string>(getDefaultStartTime());
   const [delaySeconds, setDelaySeconds] = useState<string>("2");
   const [hourlyLimit, setHourlyLimit] = useState<string>("50");
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSendLaterPopover, setShowSendLaterPopover] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [attachedFiles] = useState<Array<{ name: string; size: string }>>([
+    { name: "Tennis_Coach_Profile.png", size: "1.2 MB" },
+  ]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Default to first active sender if available
   useEffect(() => {
@@ -81,14 +96,26 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
     }
   }, [activeSenders, senderId]);
 
-  // Compute unified, normalized, and deduplicated recipient list
-  const manualEmails = useMemo(() => extractEmails(manualInput), [manualInput]);
-
-  const allRecipients = useMemo(() => {
-    return Array.from(new Set([...uploadedEmails, ...manualEmails]));
-  }, [uploadedEmails, manualEmails]);
-
   if (!isOpen) return null;
+
+  const handleAddRecipient = (value: string) => {
+    const extracted = extractEmails(value);
+    if (extracted.length > 0) {
+      setRecipientsList((prev) => Array.from(new Set([...prev, ...extracted])));
+      setRecipientInput("");
+    }
+  };
+
+  const handleKeyDownRecipient = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === "," || e.key === " ") {
+      e.preventDefault();
+      handleAddRecipient(recipientInput);
+    }
+  };
+
+  const handleRemoveRecipient = (emailToRemove: string) => {
+    setRecipientsList((prev) => prev.filter((r) => r !== emailToRemove));
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -99,39 +126,56 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
       const content = event.target?.result as string;
       if (content) {
         const parsed = extractEmails(content);
-        setUploadedEmails(parsed);
-        setUploadedFileName(`${file.name} (${parsed.length} parsed)`);
+        if (parsed.length > 0) {
+          setRecipientsList((prev) => Array.from(new Set([...prev, ...parsed])));
+        }
       }
     };
     reader.readAsText(file);
   };
 
-  const handleClearFile = () => {
-    setUploadedEmails([]);
-    setUploadedFileName(null);
+  const handleSchedulePreset = (preset: "tomorrow" | "10am" | "11am" | "3pm") => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    if (preset === "10am") {
+      d.setHours(10, 0, 0, 0);
+    } else if (preset === "11am") {
+      d.setHours(11, 0, 0, 0);
+    } else if (preset === "3pm") {
+      d.setHours(15, 0, 0, 0);
+    } else {
+      d.setHours(9, 0, 0, 0);
+    }
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    setStartTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+    setShowSendLaterPopover(false);
   };
 
-  const handleResetForm = () => {
-    setSubject("");
-    setBody("");
-    setManualInput("");
-    setUploadedEmails([]);
-    setUploadedFileName(null);
-    setStartTime(getDefaultStartTime());
-    setDelaySeconds("2");
-    setHourlyLimit("50");
-    setSubmitError(null);
-    setSubmitSuccess(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleScheduleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setSubmitError(null);
     setSubmitSuccess(null);
 
-    // Validation
+    let finalRecipients = [...recipientsList];
+    if (recipientInput.trim()) {
+      const extra = extractEmails(recipientInput);
+      finalRecipients = Array.from(new Set([...finalRecipients, ...extra]));
+      setRecipientsList(finalRecipients);
+      setRecipientInput("");
+    }
+
     if (!senderId) {
       setSubmitError("Please select a configured sender.");
+      return;
+    }
+
+    if (finalRecipients.length === 0) {
+      setSubmitError("Please provide at least one valid recipient email.");
       return;
     }
 
@@ -145,16 +189,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
       return;
     }
 
-    if (allRecipients.length === 0) {
-      setSubmitError("Please provide at least one valid recipient email (via file upload or manual entry).");
-      return;
-    }
-
-    if (allRecipients.length > 10000) {
-      setSubmitError("Maximum 10,000 recipients allowed per campaign.");
-      return;
-    }
-
     const localStartDate = new Date(startTime);
     if (isNaN(localStartDate.getTime())) {
       setSubmitError("Please choose a valid start time.");
@@ -162,19 +196,7 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
     }
 
     const delayMs = Math.round(Number(delaySeconds) * 1000);
-    if (isNaN(delayMs) || delayMs < 0) {
-      setSubmitError("Delay must be 0 or greater.");
-      return;
-    }
-
     const parsedHourlyLimit = Number(hourlyLimit);
-    if (isNaN(parsedHourlyLimit) || parsedHourlyLimit <= 0) {
-      setSubmitError("Hourly limit must be a positive integer.");
-      return;
-    }
-
-    // Convert local start time to ISO UTC
-    const isoUtcStartTime = localStartDate.toISOString();
 
     const token = localStorage.getItem("auth_token");
     const headers: Record<string, string> = {
@@ -185,7 +207,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      // NOTE: Do not send userId from the frontend (backend sets it from req.user)
       const res = await fetch("http://localhost:5000/api/emails/schedule", {
         method: "POST",
         headers,
@@ -194,25 +215,19 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
           senderId,
           subject: subject.trim(),
           body: body.trim(),
-          recipients: allRecipients,
-          startTime: isoUtcStartTime,
-          delayMs,
-          hourlyLimit: parsedHourlyLimit,
+          recipients: finalRecipients,
+          startTime: localStartDate.toISOString(),
+          delayMs: isNaN(delayMs) ? 2000 : delayMs,
+          hourlyLimit: isNaN(parsedHourlyLimit) ? 50 : parsedHourlyLimit,
         }),
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         throw new Error(data.message || "Failed to schedule emails");
       }
 
-      setSubmitSuccess(
-        `Successfully scheduled ${data.totalEmails || allRecipients.length} email(s) via BullMQ!`
-      );
-
-      handleResetForm();
-
+      setSubmitSuccess(`Campaign scheduled for ${finalRecipients.length} recipient(s)!`);
       if (onScheduledSuccess) {
         onScheduledSuccess();
       }
@@ -220,7 +235,7 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
       setTimeout(() => {
         onClose();
         setSubmitSuccess(null);
-      }, 1500);
+      }, 1200);
     } catch (err: any) {
       setSubmitError(err.message || "Unable to schedule email campaign.");
     } finally {
@@ -229,272 +244,375 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
   };
 
   return (
-    <div className="modal-backdrop animate-fade-in" onClick={onClose}>
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in"
+      onClick={onClose}
+    >
       <div
-        className="modal-container compose-modal-container"
+        className="bg-white w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border border-gray-200 p-6 flex flex-col"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="compose-modal-title"
       >
-        {/* Header */}
-        <div className="modal-header">
-          <div className="modal-title-group">
-            <div className="modal-icon-badge purple">
-              <Send size={18} />
-            </div>
-            <div>
-              <h3 id="compose-modal-title">Compose & Schedule Campaign</h3>
-              <p>BullMQ will stagger dispatches with randomized jitter delays</p>
-            </div>
+        {/* Top Header (Figma Screenshots 1-3) */}
+        <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
+              onClick={onClose}
+              title="Back"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <h2 className="text-lg font-bold text-gray-900 m-0">Compose New Email</h2>
           </div>
-          <button
-            type="button"
-            className="modal-close-btn"
-            onClick={onClose}
-            disabled={isSubmitting}
-            title="Close modal"
-          >
-            <X size={18} />
-          </button>
+
+          <div className="flex items-center gap-4 relative">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="p-1.5 text-gray-400 hover:text-gray-700 relative cursor-pointer"
+                title="Attachments (1)"
+                onClick={() => alert("Attached: Tennis_Coach_Profile.png (1.2 MB)")}
+              >
+                <Paperclip size={18} />
+                <span className="absolute -top-0.5 -right-1 text-[10px] font-bold text-emerald-600">
+                  1
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="p-1.5 text-gray-400 hover:text-gray-700 cursor-pointer"
+                title="Schedule Send"
+                onClick={() => setShowSendLaterPopover(!showSendLaterPopover)}
+              >
+                <Clock size={18} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                className="bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold text-xs px-4 py-2 rounded-full transition cursor-pointer"
+                onClick={() => setShowSendLaterPopover(!showSendLaterPopover)}
+                disabled={isSubmitting}
+              >
+                Send Later
+              </button>
+
+              <button
+                type="button"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-full inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                onClick={() => handleScheduleSubmit()}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <>
+                    <Send size={14} />
+                    <span>Send</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Send Later Popover (Figma Screenshot 3) */}
+            {showSendLaterPopover && (
+              <div className="absolute top-full right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-4 z-50 animate-fade-in">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-gray-900 m-0">Send Later</h4>
+                  <button
+                    type="button"
+                    className="text-gray-400 hover:text-gray-600 cursor-pointer p-0.5"
+                    onClick={() => setShowSendLaterPopover(false)}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div className="mb-3 relative flex items-center">
+                  <input
+                    type="datetime-local"
+                    className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-emerald-500 pr-8"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                  <Calendar size={15} className="absolute right-2.5 text-gray-400 pointer-events-none" />
+                </div>
+
+                <div className="flex flex-col gap-1 mb-4">
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded-md cursor-pointer transition"
+                    onClick={() => handleSchedulePreset("tomorrow")}
+                  >
+                    Tomorrow
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded-md cursor-pointer transition"
+                    onClick={() => handleSchedulePreset("10am")}
+                  >
+                    Tomorrow, 10:00 AM
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded-md cursor-pointer transition"
+                    onClick={() => handleSchedulePreset("11am")}
+                  >
+                    Tomorrow, 11:00 AM
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded-md cursor-pointer transition"
+                    onClick={() => handleSchedulePreset("3pm")}
+                  >
+                    Tomorrow, 3:00 PM
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    className="text-xs text-gray-500 hover:text-gray-800 px-3 py-1 cursor-pointer"
+                    onClick={() => setShowSendLaterPopover(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold text-xs px-3.5 py-1 rounded-full cursor-pointer transition"
+                    onClick={() => setShowSendLaterPopover(false)}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="modal-form compose-modal-form">
-          {submitError && (
-            <div className="modal-alert-error">
-              <AlertCircle size={18} className="alert-icon" />
-              <div className="alert-text">
-                <strong>Scheduling Error</strong>
-                <p>{submitError}</p>
-              </div>
-            </div>
-          )}
+        {/* Banners */}
+        {submitError && (
+          <div className="flex items-center gap-2 p-2.5 mb-3 rounded-lg text-xs bg-red-50 border border-red-200 text-red-700 animate-fade-in">
+            <AlertCircle size={15} />
+            <span>{submitError}</span>
+          </div>
+        )}
+        {submitSuccess && (
+          <div className="flex items-center gap-2 p-2.5 mb-3 rounded-lg text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 animate-fade-in">
+            <CheckCircle2 size={15} />
+            <span>{submitSuccess}</span>
+          </div>
+        )}
 
-          {submitSuccess && (
-            <div className="modal-alert-success">
-              <CheckCircle2 size={18} className="alert-icon" />
-              <div className="alert-text">
-                <strong>Campaign Queued</strong>
-                <p>{submitSuccess}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Sender Selection */}
-          <div className="form-group">
-            <label htmlFor="compose-sender" className="form-label">
-              Sending Account (SMTP) <span className="required-star">*</span>
-            </label>
-            {activeSenders.length === 0 ? (
-              <div className="sender-warning-box">
-                <AlertCircle size={15} />
-                <span>
-                  No active SMTP sender found. Please configure an SMTP sender in the dashboard before scheduling.
-                </span>
-              </div>
-            ) : (
+        {/* Compose Form */}
+        <div className="flex flex-col">
+          {/* From Line */}
+          <div className="flex items-center gap-4 py-2.5 border-b border-gray-100">
+            <label className="w-14 text-xs font-semibold text-gray-400">From</label>
+            <div className="inline-flex items-center bg-gray-50 border border-gray-200 rounded-full px-3 py-1 relative">
               <select
-                id="compose-sender"
-                className="form-input"
+                className="appearance-none bg-transparent border-none text-xs font-medium text-gray-800 outline-none pr-5 cursor-pointer"
                 value={senderId}
                 onChange={(e) => setSenderId(e.target.value)}
-                disabled={isSubmitting}
-                required
+                disabled={activeSenders.length === 0}
               >
-                {senders.map((s) => {
-                  const isReady = s.isActive && Boolean(s.smtpHost);
-                  return (
-                    <option key={s.id} value={s.id} disabled={!isReady}>
-                      {s.name ? `${s.name} (${s.email})` : s.email}
-                      {isReady ? " — Ready (SMTP)" : " — [Unconfigured SMTP]"}
+                {activeSenders.length === 0 ? (
+                  <option value="">No configured SMTP senders</option>
+                ) : (
+                  activeSenders.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.email} {s.name ? `(${s.name})` : ""}
                     </option>
-                  );
-                })}
+                  ))
+                )}
               </select>
-            )}
+              <ChevronDown size={13} className="absolute right-2.5 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* To Line */}
+          <div className="flex items-start gap-4 py-2.5 border-b border-gray-100">
+            <label className="w-14 text-xs font-semibold text-gray-400 pt-1">To</label>
+            <div className="flex-1 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap flex-1">
+                {recipientsList.map((r) => (
+                  <span
+                    key={r}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-emerald-500 text-emerald-700 text-xs font-medium"
+                  >
+                    <span>{r}</span>
+                    <button
+                      type="button"
+                      className="text-emerald-500 hover:text-emerald-800 p-0.5 cursor-pointer"
+                      onClick={() => handleRemoveRecipient(r)}
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+
+                <input
+                  type="email"
+                  className="flex-1 min-w-[160px] border-none outline-none text-xs text-gray-800 placeholder:text-gray-400"
+                  placeholder={
+                    recipientsList.length === 0
+                      ? "recipient@example.com (comma or Enter to add)"
+                      : "Add more..."
+                  }
+                  value={recipientInput}
+                  onChange={(e) => setRecipientInput(e.target.value)}
+                  onKeyDown={handleKeyDownRecipient}
+                  onBlur={() => handleAddRecipient(recipientInput)}
+                />
+              </div>
+
+              <div className="flex-shrink-0">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".csv,.txt"
+                  style={{ display: "none" }}
+                  onChange={handleFileUpload}
+                />
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-emerald-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload size={13} />
+                  <span>Upload List</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Subject Line */}
-          <div className="form-group">
-            <label htmlFor="compose-subject" className="form-label">
-              Subject Line <span className="required-star">*</span>
-            </label>
+          <div className="flex items-center gap-4 py-2.5 border-b border-gray-100">
+            <label className="w-14 text-xs font-semibold text-gray-400">Subject</label>
             <input
-              id="compose-subject"
               type="text"
-              className="form-input"
-              placeholder="e.g. Quick question regarding MailFlow outreach"
+              className="flex-1 border-none outline-none text-sm text-gray-900 placeholder:text-gray-400 font-medium"
+              placeholder="Subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              disabled={isSubmitting}
-              required
-              maxLength={255}
             />
           </div>
 
-          {/* Email Body */}
-          <div className="form-group">
-            <label htmlFor="compose-body" className="form-label">
-              Email Content (Body) <span className="required-star">*</span>
-            </label>
-            <textarea
-              id="compose-body"
-              className="form-input form-textarea"
-              placeholder="Write your email body here..."
-              rows={4}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              disabled={isSubmitting}
-              required
-            />
-          </div>
-
-          {/* Recipients Section (File Upload & Manual Entry) */}
-          <div className="recipients-section">
-            <div className="recipients-header">
-              <label className="form-label">
-                Recipients <span className="required-star">*</span>
-              </label>
-              <div className="recipient-counter-badge">
-                <Users size={13} />
-                <span>
-                  <strong>{allRecipients.length}</strong> unique detected
-                </span>
-              </div>
-            </div>
-
-            {/* CSV / TXT Upload Box */}
-            <div className="upload-dropzone">
+          {/* Controls: Delay & Hourly Limit */}
+          <div className="flex items-center gap-8 py-2.5 border-b border-gray-100 text-xs text-gray-600">
+            <div className="flex items-center gap-2">
+              <span>Delay between 2 emails</span>
               <input
-                type="file"
-                id="recipient-file-upload"
-                accept=".csv, .txt, text/csv, text/plain"
-                onChange={handleFileUpload}
-                disabled={isSubmitting}
-                className="file-input-hidden"
-              />
-              <label htmlFor="recipient-file-upload" className="file-upload-label">
-                <Upload size={16} />
-                <span>Upload CSV or TXT file</span>
-              </label>
-
-              {uploadedFileName && (
-                <div className="uploaded-file-chip">
-                  <FileText size={14} />
-                  <span>{uploadedFileName}</span>
-                  <button
-                    type="button"
-                    onClick={handleClearFile}
-                    className="file-remove-btn"
-                    title="Remove file"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Manual Entry */}
-            <textarea
-              id="compose-recipients-manual"
-              className="form-input form-textarea-recipients"
-              placeholder="Or enter recipient emails manually (separated by commas, spaces, or newlines)..."
-              rows={2}
-              value={manualInput}
-              onChange={(e) => setManualInput(e.target.value)}
-              disabled={isSubmitting}
-            />
-          </div>
-
-          {/* Scheduling Configuration Row */}
-          <div className="form-row">
-            {/* Start Time (Datetime Local) */}
-            <div className="form-group flex-2">
-              <label htmlFor="compose-start-time" className="form-label">
-                <Calendar size={13} className="inline-icon" /> Start Time (Local) <span className="required-star">*</span>
-              </label>
-              <input
-                id="compose-start-time"
-                type="datetime-local"
-                className="form-input"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                disabled={isSubmitting}
-                required
-              />
-              <span className="field-hint">Auto-converted to ISO UTC on dispatch</span>
-            </div>
-
-            {/* Delay between emails */}
-            <div className="form-group flex-1">
-              <label htmlFor="compose-delay" className="form-label">
-                <Clock size={13} className="inline-icon" /> Delay (sec) <span className="required-star">*</span>
-              </label>
-              <input
-                id="compose-delay"
                 type="number"
                 min="0"
-                step="1"
-                className="form-input"
+                className="w-14 h-8 bg-white border border-gray-200 rounded-lg text-center text-xs font-semibold text-gray-800 outline-none focus:border-emerald-500"
+                placeholder="00"
                 value={delaySeconds}
                 onChange={(e) => setDelaySeconds(e.target.value)}
-                disabled={isSubmitting}
-                required
               />
-              <span className="field-hint">e.g. 2s = 2000ms delay</span>
             </div>
 
-            {/* Hourly Limit */}
-            <div className="form-group flex-1">
-              <label htmlFor="compose-hourly-limit" className="form-label">
-                <Layers size={13} className="inline-icon" /> Hourly Limit <span className="required-star">*</span>
-              </label>
+            <div className="flex items-center gap-2">
+              <span>Hourly Limit</span>
               <input
-                id="compose-hourly-limit"
                 type="number"
                 min="1"
-                step="1"
-                className="form-input"
+                className="w-14 h-8 bg-white border border-gray-200 rounded-lg text-center text-xs font-semibold text-gray-800 outline-none focus:border-emerald-500"
+                placeholder="00"
                 value={hourlyLimit}
                 onChange={(e) => setHourlyLimit(e.target.value)}
-                disabled={isSubmitting}
-                required
               />
-              <span className="field-hint">Max emails / hour</span>
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="modal-footer">
-            <button
-              type="button"
-              className="btn-cancel"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
+          {/* Email Body & Rich Toolbar (Screenshots 1 & 2) */}
+          <div className="bg-gray-50/80 border border-gray-200/80 rounded-xl p-4 mt-3.5 flex flex-col">
+            <textarea
+              className="w-full bg-transparent border-none outline-none text-sm text-gray-900 placeholder:text-gray-400 resize-none min-h-[170px] font-sans leading-relaxed"
+              placeholder="Type Your Reply..."
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={8}
+            />
 
-            <button
-              type="submit"
-              className="btn-submit btn-submit-purple"
-              disabled={isSubmitting || activeSenders.length === 0}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={16} className="spin" />
-                  <span>Scheduling Campaign...</span>
-                </>
-              ) : (
-                <>
-                  <Send size={16} />
-                  <span>Schedule {allRecipients.length > 0 ? `(${allRecipients.length})` : ""} Emails</span>
-                </>
-              )}
-            </button>
+            {/* Bottom Toolbar */}
+            <div className="bg-white border border-gray-200 rounded-full px-3.5 py-1.5 flex items-center gap-2 w-fit mt-3 shadow-xs">
+              <div className="flex items-center gap-1">
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Undo">
+                  <Undo size={13} />
+                </button>
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Redo">
+                  <Redo size={13} />
+                </button>
+              </div>
+
+              <div className="w-[1px] h-3.5 bg-gray-200" />
+
+              <div className="flex items-center gap-1">
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Font Style">
+                  <Type size={13} />
+                </button>
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer font-bold" title="Bold">
+                  <Bold size={13} />
+                </button>
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer italic" title="Italic">
+                  <Italic size={13} />
+                </button>
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer underline" title="Underline">
+                  <Underline size={13} />
+                </button>
+              </div>
+
+              <div className="w-[1px] h-3.5 bg-gray-200" />
+
+              <div className="flex items-center gap-1">
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Align">
+                  <AlignLeft size={13} />
+                </button>
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="List">
+                  <List size={13} />
+                </button>
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Quote">
+                  <Quote size={13} />
+                </button>
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Code">
+                  <Code size={13} />
+                </button>
+                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Strikethrough">
+                  <Strikethrough size={13} />
+                </button>
+              </div>
+            </div>
           </div>
-        </form>
+
+          {/* Attached Files Preview */}
+          {attachedFiles.length > 0 && (
+            <div className="flex gap-3 mt-4">
+              {attachedFiles.map((file, idx) => (
+                <div key={idx} className="w-36 bg-white border border-gray-200 rounded-lg overflow-hidden shadow-xs">
+                  <div className="w-full h-20 bg-sky-600 overflow-hidden">
+                    <img
+                      src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=200&auto=format&fit=crop&q=80"
+                      alt={file.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="p-1.5 flex flex-col">
+                    <span className="text-[11px] font-semibold text-gray-900 truncate">
+                      {file.name}
+                    </span>
+                    <span className="text-[10px] text-gray-400">{file.size}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
