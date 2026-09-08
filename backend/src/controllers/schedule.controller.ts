@@ -7,6 +7,7 @@ import {
   dispatchOutboxBatch,
   reconcileDatabaseToQueue,
 } from "../services/outbox-reconciler.service";
+import { indexEmailJobsBatch } from "../services/elasticsearch.service";
 
 export const scheduleEmails = async (
   req: AuthenticatedRequest,
@@ -198,8 +199,12 @@ export const scheduleEmails = async (
     });
 
     // 5. Post-Commit Outbox Dispatch to BullMQ
-    // Dispatches newly committed outbox events to BullMQ with stable job IDs
     await dispatchOutboxBatch();
+
+    // Trigger non-blocking Elasticsearch indexing (outage resilient)
+    indexEmailJobsBatch(campaign.emails.map((e) => e.id)).catch((err) =>
+      console.warn("[Schedule Controller] Non-blocking ES indexing error:", err.message)
+    );
 
     // 6. Opportunistic Reconciliation without cron (non-blocking)
     reconcileDatabaseToQueue().catch((err) =>

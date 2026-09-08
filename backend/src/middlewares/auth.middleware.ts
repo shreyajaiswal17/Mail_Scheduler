@@ -35,11 +35,6 @@ export const requireAuth = async (
       token = req.cookies.token;
     }
 
-    // 3. Fallback to query parameter (for direct browser dashboard links)
-    if (!token && req.query && typeof req.query.token === "string") {
-      token = req.query.token;
-    }
-
     if (!token) {
       res.status(401).json({
         error: "Unauthorized",
@@ -83,17 +78,6 @@ export const requireAuth = async (
     }
 
     req.user = user;
-
-    // Set cookie if authenticated via query param for seamless browser sessions
-    if (req.query?.token && !req.cookies?.token) {
-      res.cookie("token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
-    }
-
     next();
   } catch (error: any) {
     console.error("Auth Middleware Error:", error?.message || error);
@@ -102,4 +86,40 @@ export const requireAuth = async (
       message: "Token is invalid or expired",
     });
   }
+};
+
+/**
+ * Authorization middleware for admin-only endpoints.
+ * Compares authenticated user's email against comma-separated ADMIN_EMAILS env variable.
+ */
+export const requireAdmin = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user) {
+    res.status(401).json({
+      error: "Unauthorized",
+      message: "Authentication required",
+    });
+    return;
+  }
+
+  const rawAdminEmails = process.env.ADMIN_EMAILS || "";
+  const adminEmails = rawAdminEmails
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  const userEmail = (req.user.email || "").trim().toLowerCase();
+
+  if (!adminEmails.includes(userEmail)) {
+    res.status(403).json({
+      error: "Forbidden",
+      message: "Admin access required",
+    });
+    return;
+  }
+
+  next();
 };
