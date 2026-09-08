@@ -13,6 +13,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   loginWithGoogle: () => void;
+  loginWithEmail: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   clearError: () => void;
@@ -89,6 +90,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.location.href = `${API_BASE_URL}/api/auth/google`;
   };
 
+  const loginWithEmail = async (email: string, password: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Login failed");
+      }
+
+      if (data.token) {
+        localStorage.setItem("auth_token", data.token);
+      }
+      setUser(data.user);
+      window.history.pushState({}, "", "/dashboard");
+      return true;
+    } catch (err: any) {
+      setError(err?.message || "Failed to log in");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       await fetch(`${API_BASE_URL}/api/auth/logout`, {
@@ -111,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         error,
         loginWithGoogle,
+        loginWithEmail,
         logout,
         checkAuth,
         clearError,

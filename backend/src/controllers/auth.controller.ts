@@ -183,3 +183,87 @@ export const logout = (req: Request, res: Response): void => {
     message: "Logged out successfully",
   });
 };
+
+/**
+ * Step 5: Direct email/password login
+ */
+export const emailLogin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      res.status(400).json({ error: "Please enter a valid email address" });
+      return;
+    }
+
+    if (!password || typeof password !== "string" || password.length < 1) {
+      res.status(400).json({ error: "Please enter your password" });
+      return;
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const name = cleanEmail.split("@")[0];
+
+    // Find or create user
+    let user = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: cleanEmail,
+          name: name.charAt(0).toUpperCase() + name.slice(1),
+          googleId: `email_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        },
+      });
+
+      // Provision default sender
+      await prisma.sender.upsert({
+        where: {
+          userId_email: {
+            userId: user.id,
+            email: user.email,
+          },
+        },
+        update: { isActive: true },
+        create: {
+          userId: user.id,
+          email: user.email,
+          name: user.name,
+          isActive: true,
+        },
+      });
+    }
+
+    const sessionToken = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+      },
+      getJwtSecret(),
+      { expiresIn: "7d" }
+    );
+
+    res.cookie("token", sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({
+      status: "ok",
+      token: sessionToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        avatar: user.avatar,
+      },
+    });
+  } catch (err: any) {
+    console.error("Email login failed:", err?.message || err);
+    res.status(500).json({ error: "Login failed. Please try again." });
+  }
+};

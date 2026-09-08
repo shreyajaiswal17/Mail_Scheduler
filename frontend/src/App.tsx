@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -7,6 +7,13 @@ import "./App.css";
 
 const MainContent: React.FC = () => {
   const { user, isLoading } = useAuth();
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const handlePopState = () => setCurrentPath(window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   if (isLoading) {
     return (
@@ -20,7 +27,13 @@ const MainContent: React.FC = () => {
     );
   }
 
-  return user ? <DashboardPage /> : <LoginPage />;
+  // If path is /dashboard and user is authenticated -> render DashboardPage
+  if (currentPath === "/dashboard" && user) {
+    return <DashboardPage />;
+  }
+
+  // Default: Open with the Login page (matching the design requested)
+  return <LoginPage />;
 };
 
 export default function App() {

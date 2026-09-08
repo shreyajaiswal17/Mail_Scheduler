@@ -4,6 +4,7 @@ import {
   handleGoogleCallback,
   getCurrentUser,
   logout,
+  emailLogin,
 } from "../controllers/auth.controller";
 import { requireAuth } from "../middlewares/auth.middleware";
 
@@ -15,10 +16,13 @@ router.get("/google", initiateGoogleAuth);
 // 2. Google OAuth callback endpoint
 router.get("/google/callback", handleGoogleCallback);
 
-// 3. Authenticated session check
+// 3. Email/password login endpoint
+router.post("/login", emailLogin);
+
+// 4. Authenticated session check
 router.get("/me", requireAuth, getCurrentUser);
 
-// 4. Logout endpoint
+// 5. Logout endpoint
 router.post("/logout", logout);
 
 export default router;

@@ -51,77 +51,11 @@ interface EmailItem {
   senderEmail?: string;
 }
 
-const DEMO_SENT_EMAILS: EmailItem[] = [
-  {
-    id: "sent-1",
-    recipientEmail: "Sarah Wilson",
-    subject: "Re: Project Update",
-    snippet: "Thanks for the update, Sarah. Looks good!",
-    body: "Hey Sarah,\n\nThanks for the update, Sarah. Looks good! Everything is tracking on schedule for next week's release. Let me know if you need any additional assets.\n\nBest regards,\nOliver",
-    status: "SENT",
-    date: "Nov 3, 10:23 AM",
-    starred: false,
-    senderName: "Amanda Clark",
-    senderEmail: "sender@example.com",
-  },
-  {
-    id: "sent-2",
-    recipientEmail: "Support",
-    subject: "Issue with login",
-    snippet: "I am having trouble logging in to the dashboard...",
-    body: "Hi Support Team,\n\nI am having trouble logging in to the dashboard with my credentials. Could you please verify my access token?\n\nThanks,\nOliver",
-    status: "SENT",
-    date: "Nov 2, 4:15 PM",
-    starred: false,
-    senderName: "Oliver Brown",
-    senderEmail: "oliver.brown@domain.io",
-  },
-  {
-    id: "sent-3",
-    recipientEmail: "Alex Morgan",
-    subject: "Weekly Dispatch Report",
-    snippet: "All SMTP queues processed with zero bounce events.",
-    body: "Hi Alex,\n\nHere is the weekly dispatch performance overview. All automated emails were sent according to hourly limits.\n\nCheers,\nOliver",
-    status: "SENT",
-    date: "Nov 1, 9:00 AM",
-    starred: true,
-    senderName: "Oliver Brown",
-    senderEmail: "oliver.brown@domain.io",
-  },
-];
-
-const DEMO_SCHEDULED_EMAILS: EmailItem[] = [
-  {
-    id: "sched-1",
-    recipientEmail: "tame@jmail.com, lame@jmail.com (+4)",
-    subject: "Q4 Product Showcase & Release",
-    snippet: "Exclusive preview of our upcoming multi-channel dispatch pipeline...",
-    body: "Hey Team,\n\nJoin us tomorrow for an exclusive walkthrough of the new automated dispatch pipeline.\n\nBest,\nOliver",
-    status: "SCHEDULED",
-    date: "Tomorrow, 10:00 AM",
-    starred: false,
-    senderName: "Oliver Brown",
-    senderEmail: "oliver.brown@domain.io",
-  },
-  {
-    id: "sched-2",
-    recipientEmail: "dame@jmail.com",
-    subject: "Follow up: API Integration Consultation",
-    snippet: "Sharing the technical documentation and webhook specifications...",
-    body: "Hi there,\n\nFollowing up on our call regarding the rate-limiter service and webhook integration.\n\nRegards,\nOliver",
-    status: "SCHEDULED",
-    date: "Tomorrow, 3:00 PM",
-    starred: true,
-    senderName: "Oliver Brown",
-    senderEmail: "oliver.brown@domain.io",
-  },
-];
-
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
 
   // Navigation tabs: 'sent' | 'scheduled' | 'senders' | 'slack'
-  const [activeTab, setActiveTab] = useState<"sent" | "scheduled" | "senders" | "slack">("sent");
+  const [activeTab, setActiveTab] = useState<"sent" | "scheduled" | "senders" | "slack">("scheduled");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Real data state
@@ -131,8 +65,8 @@ export const DashboardPage: React.FC = () => {
 
   const [realEmails, setRealEmails] = useState<EmailItem[]>([]);
   const [isLoadingEmails, setIsLoadingEmails] = useState(false);
-  const [scheduledCount, setScheduledCount] = useState<number>(12);
-  const [sentCount, setSentCount] = useState<number>(785);
+  const [scheduledCount, setScheduledCount] = useState<number>(0);
+  const [sentCount, setSentCount] = useState<number>(0);
 
   // Modals & Popovers
   const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -198,6 +132,31 @@ export const DashboardPage: React.FC = () => {
     }
   }, []);
 
+  const fetchEmailCounts = useCallback(async () => {
+    try {
+      const [schedRes, sentRes] = await Promise.all([
+        fetch("http://localhost:5000/api/emails?status=SCHEDULED&limit=1", {
+          headers: getAuthHeaders(),
+          credentials: "include",
+        }),
+        fetch("http://localhost:5000/api/emails?status=SENT&limit=1", {
+          headers: getAuthHeaders(),
+          credentials: "include",
+        }),
+      ]);
+      if (schedRes.ok) {
+        const data = await schedRes.json();
+        setScheduledCount(typeof data.total === "number" ? data.total : 0);
+      }
+      if (sentRes.ok) {
+        const data = await sentRes.json();
+        setSentCount(typeof data.total === "number" ? data.total : 0);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch email counts:", err);
+    }
+  }, []);
+
   const fetchEmails = useCallback(async () => {
     try {
       setIsLoadingEmails(true);
@@ -226,10 +185,12 @@ export const DashboardPage: React.FC = () => {
             starred: false,
           }));
           setRealEmails(mapped);
-          if (activeTab === "scheduled") setScheduledCount(data.total || mapped.length);
-          if (activeTab === "sent") setSentCount(data.total || mapped.length);
+          if (activeTab === "scheduled") setScheduledCount(data.total ?? mapped.length);
+          if (activeTab === "sent") setSentCount(data.total ?? mapped.length);
         } else {
           setRealEmails([]);
+          if (activeTab === "scheduled") setScheduledCount(0);
+          if (activeTab === "sent") setSentCount(0);
         }
       }
     } catch (err) {
@@ -242,31 +203,39 @@ export const DashboardPage: React.FC = () => {
   useEffect(() => {
     checkDb();
     fetchSenders();
-  }, [fetchSenders]);
+    fetchEmailCounts();
+  }, [fetchSenders, fetchEmailCounts]);
 
   useEffect(() => {
     if (activeTab === "scheduled" || activeTab === "sent") {
       fetchEmails();
+      fetchEmailCounts();
     }
-  }, [activeTab, fetchEmails]);
+  }, [activeTab, fetchEmails, fetchEmailCounts]);
 
-  // Compute displayed list: use real API emails if present, else fallback to Figma demo emails
+  // Periodic polling for realtime email and count updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchEmailCounts();
+      if (activeTab === "scheduled" || activeTab === "sent") {
+        fetchEmails();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [activeTab, fetchEmails, fetchEmailCounts]);
+
+  // Compute displayed list: ONLY real API emails (no fake demo emails)
   const displayedEmails = useMemo(() => {
-    let source = realEmails;
-    if (source.length === 0 && !searchQuery) {
-      source = activeTab === "scheduled" ? DEMO_SCHEDULED_EMAILS : DEMO_SENT_EMAILS;
-    }
-
-    if (!searchQuery.trim()) return source;
+    if (!searchQuery.trim()) return realEmails;
 
     const q = searchQuery.toLowerCase();
-    return source.filter(
+    return realEmails.filter(
       (e) =>
         e.recipientEmail.toLowerCase().includes(q) ||
         e.subject.toLowerCase().includes(q) ||
         (e.snippet && e.snippet.toLowerCase().includes(q))
     );
-  }, [realEmails, activeTab, searchQuery]);
+  }, [realEmails, searchQuery]);
 
   const handleOpenSenderModal = (prefillEmail?: string, prefillName?: string) => {
     setSenderFormData({
@@ -665,6 +634,7 @@ export const DashboardPage: React.FC = () => {
                   onClick={() => {
                     fetchEmails();
                     fetchSenders();
+                    fetchEmailCounts();
                   }}
                 >
                   <RotateCw size={17} className={isLoadingEmails ? "animate-spin" : ""} />
@@ -1040,6 +1010,7 @@ export const DashboardPage: React.FC = () => {
         onScheduledSuccess={() => {
           fetchEmails();
           fetchSenders();
+          fetchEmailCounts();
         }}
       />
     </div>
