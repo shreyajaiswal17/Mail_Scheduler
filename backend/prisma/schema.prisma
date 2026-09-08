@@ -126,6 +126,7 @@ model SlackConnection {
   botUserId   String?
   accessToken String   @db.Text
   channelId   String?
+  channelName String?
   scope       String?
   connectedAt DateTime @default(now())
   updatedAt   DateTime @updatedAt @default(now())
@@ -142,4 +143,23 @@ model SearchOutbox {
   updatedAt DateTime     @updatedAt
 
   @@index([status, updatedAt])
+}
+
+model SlackNotificationOutbox {
+  id            String       @id @default(uuid())
+  userId        String
+  senderId      String?
+  channelId     String
+  eventType     String       @default("HOURLY_LIMIT")
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  maxAttempts   Int          @default(3)
+  lastError     String?      @db.Text
+  nextAttemptAt DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([userId, createdAt])
 }

@@ -7,6 +7,7 @@ import { decryptPassword } from "../lib/encryption";
 import { reserveSendingSlot } from "../services/rate-limiter.service";
 import { reconcileDatabaseToQueue } from "../services/outbox-reconciler.service";
 import { indexEmailJob } from "../services/elasticsearch.service";
+import { notifySenderHourlyLimit } from "../services/slack.service";
 
 const concurrency = Number(process.env.WORKER_CONCURRENCY || 5);
 const LEASE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -192,6 +193,20 @@ export const emailWorker = new Worker(
       console.log(
         `[Rate Limiter] Sender ${sender.email} rate-limited (${reservation.reason}). Delaying job ${job.id} for ${reservation.retryAfterMs}ms (until ${new Date(nextEligibleTime).toISOString()}).`
       );
+
+      // Trigger Slack notification asynchronously and safely if sender hourly limit is reached
+      if (reservation.reason === "SENDER_HOURLY_LIMIT") {
+        notifySenderHourlyLimit({
+          userId: sender.userId,
+          senderId: sender.id,
+          senderEmail: sender.email,
+          senderName: sender.name,
+          hourlyLimit: reservation.senderHourlyLimit || 0,
+          nextEligibleTime,
+        }).catch((err) => {
+          console.warn("[Slack Worker Alert] Non-fatal notification error:", err?.message || err);
+        });
+      }
 
       await prisma.emailJob.updateMany({
         where: { id: email.id, claimToken },

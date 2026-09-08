@@ -119,6 +119,19 @@ export async function saveSlackConnection(userId: string, oauthData: any): Promi
   });
 }
 
+const SLACK_CHAT_POST_MESSAGE_URL = "https://slack.com/api/chat.postMessage";
+const SLACK_CONVERSATIONS_LIST_URL = "https://slack.com/api/conversations.list";
+const SLACK_CONVERSATIONS_JOIN_URL = "https://slack.com/api/conversations.join";
+
+export interface HourlyLimitAlertData {
+  userId: string;
+  senderId: string;
+  senderEmail: string;
+  senderName?: string | null;
+  hourlyLimit: number;
+  nextEligibleTime: number;
+}
+
 export async function getSlackConnectionStatus(userId: string): Promise<any> {
   const connection = await prisma.slackConnection.findUnique({
     where: { userId },
@@ -134,6 +147,7 @@ export async function getSlackConnectionStatus(userId: string): Promise<any> {
     teamName: connection.teamName,
     botUserId: connection.botUserId,
     channelId: connection.channelId,
+    channelName: connection.channelName,
     scope: connection.scope,
     connectedAt: connection.connectedAt,
     updatedAt: connection.updatedAt,
@@ -179,4 +193,387 @@ export async function getDecryptedBotToken(userId: string): Promise<string | nul
   }
 
   return decryptToken(connection.accessToken);
+}
+
+/**
+ * Lists available public and private Slack channels accessible by the workspace bot.
+ */
+export async function listSlackChannels(userId: string): Promise<Array<{ id: string; name: string; is_private: boolean; is_member: boolean }>> {
+  const token = await getDecryptedBotToken(userId);
+  if (!token) {
+    throw new Error("Slack workspace is not connected");
+  }
+
+  const response = await fetch(`${SLACK_CONVERSATIONS_LIST_URL}?types=public_channel,private_channel&exclude_archived=true&limit=200`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await response.json();
+  if (!data.ok) {
+    throw new Error(data.error || "Failed to fetch Slack channels from API");
+  }
+
+  return (data.channels || []).map((ch: any) => ({
+    id: ch.id,
+    name: ch.name,
+    is_private: Boolean(ch.is_private),
+    is_member: Boolean(ch.is_member),
+  }));
+}
+
+/**
+ * Resolves a channel name or ID to an active channel ID and saves it to PostgreSQL.
+ */
+export async function setSlackNotificationChannel(
+  userId: string,
+  channelInput: string
+): Promise<{ channelId: string; channelName: string }> {
+  const token = await getDecryptedBotToken(userId);
+  if (!token) {
+    throw new Error("Slack workspace is not connected");
+  }
+
+  const channels = await listSlackChannels(userId);
+  const cleanInput = channelInput.replace(/^#/, "").trim().toLowerCase();
+
+  const matched = channels.find(
+    (c) => c.id === channelInput.trim() || c.name.toLowerCase() === cleanInput
+  );
+
+  let targetChannelId: string;
+  let targetChannelName: string;
+
+  if (matched) {
+    targetChannelId = matched.id;
+    targetChannelName = matched.name;
+
+    // Join channel if bot is not already a member
+    if (!matched.is_member) {
+      try {
+        await fetch(SLACK_CONVERSATIONS_JOIN_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ channel: targetChannelId }),
+        });
+      } catch (joinErr) {
+        console.warn(`[Slack] Auto-join for channel ${targetChannelId} non-fatal warning:`, joinErr);
+      }
+    }
+  } else if (/^[A-Z0-9]{8,12}$/.test(channelInput.trim())) {
+    // If user entered a direct channel ID (e.g. C0C0761S84B) not yet in cache
+    targetChannelId = channelInput.trim();
+    targetChannelName = "channel";
+  } else {
+    throw new Error(`Channel "${channelInput}" not found in your connected Slack workspace`);
+  }
+
+  await prisma.slackConnection.update({
+    where: { userId },
+    data: {
+      channelId: targetChannelId,
+      channelName: targetChannelName,
+      updatedAt: new Date(),
+    },
+  });
+
+  return { channelId: targetChannelId, channelName: targetChannelName };
+}
+
+/**
+ * Sends a real Slack message via chat.postMessage using decrypted bot token.
+ */
+export async function postSlackMessage(
+  userId: string,
+  channelId: string,
+  text: string,
+  blocks?: any[]
+): Promise<{ ok: boolean; ts?: string; channel?: string; error?: string }> {
+  const token = await getDecryptedBotToken(userId);
+  if (!token) {
+    throw new Error("Slack workspace is not connected");
+  }
+
+  const payload: any = {
+    channel: channelId,
+    text,
+  };
+  if (blocks && blocks.length > 0) {
+    payload.blocks = blocks;
+  }
+
+  const res = await fetch(SLACK_CHAT_POST_MESSAGE_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json; charset=utf-8",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!data.ok) {
+    return { ok: false, error: data.error || "Slack chat.postMessage failed" };
+  }
+
+  return { ok: true, ts: data.ts, channel: data.channel };
+}
+
+/**
+ * Attempts delivery for a SlackNotificationOutbox record with bounded retries.
+ */
+export async function deliverSlackNotification(outboxId: string): Promise<boolean> {
+  const record = await prisma.slackNotificationOutbox.findUnique({
+    where: { id: outboxId },
+  });
+
+  if (!record || record.status === "DISPATCHED") {
+    return true;
+  }
+
+  try {
+    const payload = record.payload as any;
+    const result = await postSlackMessage(
+      record.userId,
+      record.channelId,
+      payload.text || "MailFlow Automated Notification",
+      payload.blocks
+    );
+
+    if (result.ok) {
+      await prisma.slackNotificationOutbox.update({
+        where: { id: outboxId },
+        data: {
+          status: "DISPATCHED",
+          attempts: record.attempts + 1,
+          updatedAt: new Date(),
+        },
+      });
+      return true;
+    }
+
+    throw new Error(result.error || "Failed to post message");
+  } catch (err: any) {
+    const nextAttempts = record.attempts + 1;
+    const isExhausted = nextAttempts >= record.maxAttempts;
+    const backoffMs = Math.pow(3, nextAttempts) * 3000; // 9s, 27s
+
+    await prisma.slackNotificationOutbox.update({
+      where: { id: outboxId },
+      data: {
+        attempts: nextAttempts,
+        status: isExhausted ? "FAILED" : "PENDING",
+        lastError: err?.message || String(err),
+        nextAttemptAt: new Date(Date.now() + backoffMs),
+        updatedAt: new Date(),
+      },
+    });
+
+    console.warn(
+      `[Slack Outbox] Delivery attempt ${nextAttempts}/${record.maxAttempts} failed for ${outboxId}:`,
+      err?.message || err
+    );
+    return false;
+  }
+}
+
+/**
+ * Sends a verified test notification into the saved Slack channel.
+ */
+export async function sendSlackTestNotification(userId: string): Promise<{ success: boolean; channel: string; ts?: string }> {
+  const connection = await prisma.slackConnection.findUnique({
+    where: { userId },
+  });
+
+  if (!connection || !connection.channelId) {
+    throw new Error("No notification channel configured. Please select and save a Slack channel first.");
+  }
+
+  const channelDisplay = connection.channelName ? `#${connection.channelName}` : connection.channelId;
+  const timestamp = new Date().toLocaleTimeString("en-US", { timeZone: "UTC", timeZoneName: "short" });
+
+  const text = `MailFlow Test Alert: Notification system connected to ${channelDisplay}!`;
+  const blocks = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "⚡ MailFlow Notification System Test",
+        emoji: true,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Success!* Your Slack integration is active.\nRate-limit and dispatch alerts for your mail campaigns will be posted to this channel.`,
+      },
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `*Channel:* ${channelDisplay} | *Workspace:* ${connection.teamName || connection.teamId} | *Timestamp:* ${timestamp}`,
+        },
+      ],
+    },
+  ];
+
+  // Create durable intent in outbox
+  const outbox = await prisma.slackNotificationOutbox.create({
+    data: {
+      userId,
+      channelId: connection.channelId,
+      eventType: "TEST",
+      payload: { text, blocks },
+      status: "PENDING",
+      attempts: 0,
+      maxAttempts: 3,
+      nextAttemptAt: new Date(),
+    },
+  });
+
+  const delivered = await deliverSlackNotification(outbox.id);
+  if (!delivered) {
+    throw new Error("Failed to deliver test notification to Slack. Please ensure the bot is added to the channel.");
+  }
+
+  return { success: true, channel: channelDisplay };
+}
+
+/**
+ * Emits an hourly sending limit alert to Slack when Redis rate limiter returns SENDER_HOURLY_LIMIT.
+ * Completely non-blocking and safe: deduplicates per user, sender, and hour.
+ */
+export async function notifySenderHourlyLimit(
+  data: HourlyLimitAlertData
+): Promise<{ dispatched: boolean; reason?: string }> {
+  try {
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const windowStartMs = Math.floor(Date.now() / ONE_HOUR_MS) * ONE_HOUR_MS;
+    const dedupKey = `slack:dedup:${data.userId}:${data.senderId}:${windowStartMs}`;
+
+    // 1. Hourly Window Deduplication
+    const acquired = await redis.set(dedupKey, "1", "EX", 7200, "NX");
+    if (!acquired) {
+      return { dispatched: false, reason: "DEDUPLICATED" };
+    }
+
+    // 2. Dynamic Connection & Channel Check
+    const connection = await prisma.slackConnection.findUnique({
+      where: { userId: data.userId },
+    });
+
+    if (!connection || !connection.channelId) {
+      return { dispatched: false, reason: "SLACK_NOT_CONNECTED_OR_NO_CHANNEL" };
+    }
+
+    const senderDisplay = data.senderName
+      ? `${data.senderName} (${data.senderEmail})`
+      : data.senderEmail;
+    const nextTimeStr = new Date(data.nextEligibleTime).toUTCString();
+
+    const text = `⚠️ Hourly sending limit reached for sender ${senderDisplay}. Limit: ${data.hourlyLimit}/hr. Next eligible dispatch: ${nextTimeStr}.`;
+    const blocks = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "⚠️ Sender Hourly Sending Limit Reached",
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*Sender:*\n${senderDisplay}`,
+          },
+          {
+            type: "mrkdwn",
+            text: `*Hourly Limit:*\n${data.hourlyLimit} emails / hr`,
+          },
+        ],
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*Dispatch Status:*\nPaused until quota resets`,
+          },
+          {
+            type: "mrkdwn",
+            text: `*Next Eligible Window:*\n${nextTimeStr}`,
+          },
+        ],
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: "Pending emails remain safely queued and will resume dispatch automatically once the window opens.",
+          },
+        ],
+      },
+    ];
+
+    // 3. Durable Outbox Intent
+    const outbox = await prisma.slackNotificationOutbox.create({
+      data: {
+        userId: data.userId,
+        senderId: data.senderId,
+        channelId: connection.channelId,
+        eventType: "HOURLY_LIMIT",
+        payload: {
+          senderEmail: data.senderEmail,
+          senderName: data.senderName,
+          hourlyLimit: data.hourlyLimit,
+          nextEligibleTime: data.nextEligibleTime,
+          text,
+          blocks,
+        },
+        status: "PENDING",
+        attempts: 0,
+        maxAttempts: 3,
+        nextAttemptAt: new Date(),
+      },
+    });
+
+    // 4. Asynchronous delivery attempt
+    deliverSlackNotification(outbox.id).catch((err) => {
+      console.warn("[Slack] Outbox immediate delivery error:", err?.message || err);
+    });
+
+    return { dispatched: true };
+  } catch (err: any) {
+    console.error("[Slack Service] Unexpected error in notifySenderHourlyLimit:", err?.message || err);
+    return { dispatched: false, reason: err?.message || "ERROR" };
+  }
+}
+
+/**
+ * Sweeps and retries any pending notifications whose nextAttemptAt is past due.
+ */
+export async function retryPendingSlackNotifications(): Promise<number> {
+  const pending = await prisma.slackNotificationOutbox.findMany({
+    where: {
+      status: "PENDING",
+      nextAttemptAt: { lte: new Date() },
+    },
+    take: 20,
+    orderBy: { nextAttemptAt: "asc" },
+  });
+
+  let processed = 0;
+  for (const item of pending) {
+    const success = await deliverSlackNotification(item.id);
+    if (success) processed++;
+  }
+  return processed;
 }

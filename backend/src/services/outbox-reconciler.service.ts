@@ -272,6 +272,13 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
     } catch (esErr: any) {
       console.warn("[Reconciler] Non-blocking ES reconciliation error:", esErr.message);
     }
+
+    try {
+      const { retryPendingSlackNotifications } = await import("./slack.service");
+      await retryPendingSlackNotifications();
+    } catch (slackRetryErr: any) {
+      console.warn("[Reconciler] Non-blocking Slack outbox retry error:", slackRetryErr?.message || slackRetryErr);
+    }
   } catch (error) {
     console.error("[Reconciler] Error during database-to-queue reconciliation:", error);
   }

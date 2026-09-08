@@ -11,6 +11,9 @@ import {
   Hash,
   Clock,
   X,
+  Send,
+  BellRing,
+  Check,
 } from "lucide-react";
 
 interface SlackStatusResponse {
@@ -19,8 +22,17 @@ interface SlackStatusResponse {
   teamName?: string | null;
   botUserId?: string | null;
   channelId?: string | null;
+  channelName?: string | null;
+  scope?: string | null;
   connectedAt?: string | null;
   updatedAt?: string | null;
+}
+
+interface SlackChannelItem {
+  id: string;
+  name: string;
+  is_private: boolean;
+  is_member: boolean;
 }
 
 interface SlackConnectionCardProps {
@@ -64,6 +76,17 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Channels and Alerts State
+  const [channels, setChannels] = useState<SlackChannelItem[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<string>("");
+  const [customChannelInput, setCustomChannelInput] = useState<string>("");
+  const [useCustomChannel, setUseCustomChannel] = useState<boolean>(false);
+  const [isLoadingChannels, setIsLoadingChannels] = useState<boolean>(false);
+  const [isSavingChannel, setIsSavingChannel] = useState<boolean>(false);
+  const [isSendingTest, setIsSendingTest] = useState<boolean>(false);
+  const [channelSuccessMessage, setChannelSuccessMessage] = useState<string | null>(null);
+  const [testNotificationMessage, setTestNotificationMessage] = useState<string | null>(null);
+
   const onStatusChangeRef = useRef(onStatusChange);
   useEffect(() => {
     onStatusChangeRef.current = onStatusChange;
@@ -77,6 +100,26 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
     };
   };
 
+  const fetchChannels = useCallback(async () => {
+    try {
+      setIsLoadingChannels(true);
+      const res = await fetch(`${API_BASE_URL}/api/slack/channels`, {
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.channels && Array.isArray(data.channels)) {
+          setChannels(data.channels);
+        }
+      }
+    } catch (err) {
+      console.warn("[Slack] Failed to fetch channel list:", err);
+    } finally {
+      setIsLoadingChannels(false);
+    }
+  }, []);
+
   const fetchStatus = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) setIsLoading(true);
@@ -88,7 +131,16 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
       if (res.ok) {
         const data: SlackStatusResponse = await res.json();
         setStatus(data);
+        if (data.channelName) {
+          setSelectedChannel(data.channelName);
+        } else if (data.channelId) {
+          setSelectedChannel(data.channelId);
+        }
         onStatusChangeRef.current?.(data);
+
+        if (data.connected) {
+          fetchChannels();
+        }
       } else if (res.status === 401) {
         setStatus({ connected: false });
         onStatusChangeRef.current?.({ connected: false });
@@ -102,7 +154,7 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
     } finally {
       if (showLoading) setIsLoading(false);
     }
-  }, []);
+  }, [fetchChannels]);
 
   // Handle OAuth callback params on mount and fetch initial status
   useEffect(() => {
@@ -158,12 +210,86 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
     }
   };
 
+  // Save selected channel
+  const handleSaveChannel = async () => {
+    const channelToSave = useCustomChannel ? customChannelInput.trim() : selectedChannel;
+    if (!channelToSave) {
+      setErrorMessage("Please select or enter a Slack channel");
+      return;
+    }
+
+    try {
+      setIsSavingChannel(true);
+      setErrorMessage(null);
+      setChannelSuccessMessage(null);
+      setTestNotificationMessage(null);
+
+      const res = await fetch(`${API_BASE_URL}/api/slack/channel`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ channel: channelToSave }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to configure Slack channel");
+      }
+
+      setChannelSuccessMessage(data.message || "Notification channel saved successfully!");
+      setStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              channelId: data.channelId,
+              channelName: data.channelName,
+            }
+          : prev
+      );
+      fetchStatus(false);
+    } catch (err: any) {
+      console.error("[Slack] Failed to save channel:", err);
+      setErrorMessage(err.message || "Failed to save channel");
+    } finally {
+      setIsSavingChannel(false);
+    }
+  };
+
+  // Send live test notification
+  const handleSendTestNotification = async () => {
+    try {
+      setIsSendingTest(true);
+      setErrorMessage(null);
+      setTestNotificationMessage(null);
+
+      const res = await fetch(`${API_BASE_URL}/api/slack/test-notification`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to dispatch test notification");
+      }
+
+      setTestNotificationMessage(data.message || "Test alert delivered successfully to Slack!");
+    } catch (err: any) {
+      console.error("[Slack] Test notification failed:", err);
+      setErrorMessage(err.message || "Failed to send test alert to Slack");
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
   // Disconnect existing Slack connection
   const handleDisconnect = async () => {
     try {
       setIsDisconnecting(true);
       setErrorMessage(null);
       setSuccessMessage(null);
+      setChannelSuccessMessage(null);
+      setTestNotificationMessage(null);
 
       const res = await fetch(`${API_BASE_URL}/api/slack/disconnect`, {
         method: "POST",
@@ -179,6 +305,8 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
 
       const disconnectedState: SlackStatusResponse = { connected: false };
       setStatus(disconnectedState);
+      setChannels([]);
+      setSelectedChannel("");
       if (onStatusChange) onStatusChange(disconnectedState);
       setSuccessMessage("Slack workspace disconnected successfully.");
     } catch (err: any) {
@@ -190,6 +318,7 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
   };
 
   const isConnected = Boolean(status?.connected);
+
 
   return (
     <div className="slack-integration-card">
@@ -332,6 +461,134 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
               <span>
                 Bot token encrypted with AES-256-GCM in PostgreSQL. Token is never stored or exposed to the client.
               </span>
+            </div>
+
+          
+            <div className="slack-channel-config-card">
+              <div className="channel-config-header">
+                <div className="channel-config-title">
+                  <BellRing size={16} className="text-purple" />
+                  <h4>Alert Notification Channel</h4>
+                </div>
+                {status?.channelId ? (
+                  <span className="current-channel-badge">
+                    <Hash size={12} />
+                    {status.channelName || status.channelId}
+                  </span>
+                ) : (
+                  <span className="current-channel-badge unconfigured">
+                    No channel configured
+                  </span>
+                )}
+              </div>
+
+              <p className="channel-config-subtitle">
+                Select where rate-limit warnings and dispatch notifications will be posted. When an email sender reaches its hourly limit, an alert is automatically delivered here.
+              </p>
+
+              {channelSuccessMessage && (
+                <div className="slack-mini-alert success animate-fade-in">
+                  <CheckCircle2 size={15} />
+                  <span>{channelSuccessMessage}</span>
+                </div>
+              )}
+
+              {testNotificationMessage && (
+                <div className="slack-mini-alert success animate-fade-in">
+                  <CheckCircle2 size={15} />
+                  <span>{testNotificationMessage}</span>
+                </div>
+              )}
+
+              <div className="channel-selection-row">
+                <div className="channel-input-container">
+                  {!useCustomChannel ? (
+                    <div className="channel-select-wrap">
+                      <select
+                        id="slack-channel-select"
+                        className="channel-dropdown-select"
+                        value={selectedChannel}
+                        onChange={(e) => setSelectedChannel(e.target.value)}
+                        disabled={isLoadingChannels || isSavingChannel}
+                      >
+                        <option value="">-- Choose a Slack Channel --</option>
+                        {channels.map((ch) => (
+                          <option key={ch.id} value={ch.name}>
+                            #{ch.name} {ch.is_private ? "(private)" : ""} {!ch.is_member ? "(bot will auto-join)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="btn-link-toggle"
+                        onClick={() => setUseCustomChannel(true)}
+                      >
+                        Enter manually
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="channel-custom-input-wrap">
+                      <input
+                        id="slack-custom-channel-input"
+                        type="text"
+                        className="channel-text-input"
+                        placeholder="#mail-scheduler-alerts or C0C0761S84B"
+                        value={customChannelInput}
+                        onChange={(e) => setCustomChannelInput(e.target.value)}
+                        disabled={isSavingChannel}
+                      />
+                      <button
+                        type="button"
+                        className="btn-link-toggle"
+                        onClick={() => setUseCustomChannel(false)}
+                      >
+                        Choose from list
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="channel-action-btns">
+                  <button
+                    id="save-slack-channel-btn"
+                    className="btn-save-channel"
+                    onClick={handleSaveChannel}
+                    disabled={isSavingChannel || (!selectedChannel && !customChannelInput.trim())}
+                  >
+                    {isSavingChannel ? (
+                      <>
+                        <Loader2 size={14} className="spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check size={14} />
+                        <span>Save Channel</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    id="send-slack-test-btn"
+                    className="btn-test-notification"
+                    onClick={handleSendTestNotification}
+                    disabled={isSendingTest || !status?.channelId}
+                    title={!status?.channelId ? "Please save a channel first" : "Send a live test alert to Slack"}
+                  >
+                    {isSendingTest ? (
+                      <>
+                        <Loader2 size={14} className="spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send size={14} />
+                        <span>Send Test Alert</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="slack-action-toolbar">

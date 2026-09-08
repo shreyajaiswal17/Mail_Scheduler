@@ -162,3 +162,93 @@ export const disconnectSlackController = async (
     res.status(500).json({ error: "Internal Server Error", message: "Failed to disconnect Slack workspace" });
   }
 };
+
+export const getSlackChannelsController = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized", message: "Authentication required" });
+      return;
+    }
+
+    const { listSlackChannels } = await import("../services/slack.service");
+    const channels = await listSlackChannels(userId);
+    res.status(200).json({ success: true, channels });
+  } catch (error: any) {
+    console.error("[Slack Controller] Error listing channels:", error?.message || error);
+    const statusCode = error.message?.includes("not connected") ? 400 : 500;
+    res.status(statusCode).json({
+      error: "Slack Channel Error",
+      message: error.message || "Failed to retrieve Slack channels",
+    });
+  }
+};
+
+export const setSlackChannelController = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized", message: "Authentication required" });
+      return;
+    }
+
+    const { channel } = req.body;
+    if (!channel || typeof channel !== "string" || !channel.trim()) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "Channel name or channel ID is required",
+      });
+      return;
+    }
+
+    const { setSlackNotificationChannel } = await import("../services/slack.service");
+    const result = await setSlackNotificationChannel(userId, channel.trim());
+
+    res.status(200).json({
+      success: true,
+      message: `Notification channel set to ${result.channelName ? `#${result.channelName}` : result.channelId}`,
+      channelId: result.channelId,
+      channelName: result.channelName,
+    });
+  } catch (error: any) {
+    console.error("[Slack Controller] Error setting channel:", error?.message || error);
+    res.status(400).json({
+      error: "Channel Selection Error",
+      message: error.message || "Failed to configure Slack notification channel",
+    });
+  }
+};
+
+export const sendSlackTestNotificationController = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized", message: "Authentication required" });
+      return;
+    }
+
+    const { sendSlackTestNotification } = await import("../services/slack.service");
+    const result = await sendSlackTestNotification(userId);
+
+    res.status(200).json({
+      success: true,
+      message: `Test notification sent successfully to ${result.channel}`,
+      channel: result.channel,
+    });
+  } catch (error: any) {
+    console.error("[Slack Controller] Error sending test notification:", error?.message || error);
+    res.status(400).json({
+      error: "Test Notification Error",
+      message: error.message || "Failed to send test alert to Slack",
+    });
+  }
+};
