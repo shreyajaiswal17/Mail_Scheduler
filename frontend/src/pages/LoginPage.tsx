@@ -40,14 +40,14 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full bg-white flex items-center justify-center p-4">
-      <div className="w-full max-w-[390px] bg-white border border-gray-100 rounded-2xl p-8 shadow-[0_2px_16px_rgba(0,0,0,0.03)] transition-all">
-        <h1 className="text-[28px] font-bold text-gray-900 text-center tracking-tight mb-7">
+      <div className="w-full max-w-[420px] bg-white border border-gray-100 rounded-2xl p-8 sm:p-10 shadow-[0_4px_24px_rgba(0,0,0,0.04)] transition-all">
+        <h1 className="text-3xl font-bold font-display text-gray-900 text-center tracking-tight mb-8">
           Login
         </h1>
 
         {displayError && (
-          <div className="mb-5 p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-xs flex items-start gap-2">
-            <AlertCircle size={15} className="shrink-0 mt-0.5" />
+          <div className="mb-6 p-3.5 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm flex items-start gap-2.5">
+            <AlertCircle size={17} className="shrink-0 mt-0.5" />
             <div className="flex-1 leading-snug">{displayError}</div>
           </div>
         )}
@@ -56,9 +56,9 @@ export const LoginPage: React.FC = () => {
           type="button"
           id="google-login-btn"
           onClick={loginWithGoogle}
-          className="w-full h-11 px-4 rounded-lg bg-[#EAF7ED] hover:bg-[#dcf2e1] active:bg-[#d2edd8] flex items-center justify-center gap-2.5 text-xs font-semibold text-gray-800 transition cursor-pointer"
+          className="w-full h-12 px-5 rounded-xl bg-[#EAF7ED] hover:bg-[#dcf2e1] active:bg-[#d2edd8] flex items-center justify-center gap-3 text-sm font-semibold text-gray-800 transition cursor-pointer"
         >
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+          <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24">
             <path
               fill="#4285F4"
               d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z"
@@ -79,22 +79,22 @@ export const LoginPage: React.FC = () => {
           <span>Login with Google</span>
         </button>
 
-        <div className="relative my-6 flex items-center justify-center">
+        <div className="relative my-6.5 flex items-center justify-center">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-100"></div>
           </div>
-          <div className="relative bg-white px-3 text-[11px] text-gray-400 font-normal">
+          <div className="relative bg-white px-3.5 text-xs text-gray-400 font-medium">
             or sign up through email
           </div>
         </div>
 
-        <form onSubmit={handleEmailLogin} className="flex flex-col gap-3">
+        <form onSubmit={handleEmailLogin} className="flex flex-col gap-3.5">
           <div>
             <input
               type="email"
               id="login-email-input"
               placeholder="Email ID"
-              className="w-full h-11 px-3.5 bg-[#F2F4F5] border border-transparent rounded-lg text-xs text-gray-900 placeholder:text-gray-400 outline-none focus:bg-white focus:border-gray-300 focus:ring-2 focus:ring-emerald-500/10 transition"
+              className="w-full h-12 px-4 bg-[#F2F4F5] border border-transparent rounded-xl text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:bg-white focus:border-gray-300 focus:ring-2 focus:ring-emerald-500/10 transition"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isSubmitting}
@@ -106,7 +106,7 @@ export const LoginPage: React.FC = () => {
               type="password"
               id="login-password-input"
               placeholder="Password"
-              className="w-full h-11 px-3.5 bg-[#F2F4F5] border border-transparent rounded-lg text-xs text-gray-900 placeholder:text-gray-400 outline-none focus:bg-white focus:border-gray-300 focus:ring-2 focus:ring-emerald-500/10 transition"
+              className="w-full h-12 px-4 bg-[#F2F4F5] border border-transparent rounded-xl text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:bg-white focus:border-gray-300 focus:ring-2 focus:ring-emerald-500/10 transition"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isSubmitting}
@@ -117,11 +117,11 @@ export const LoginPage: React.FC = () => {
             type="submit"
             id="email-login-btn"
             disabled={isSubmitting}
-            className="w-full h-11 mt-3 rounded-lg bg-[#009A49] hover:bg-[#008740] active:bg-[#007a39] text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-xs disabled:opacity-70"
+            className="w-full h-12 mt-2 rounded-xl bg-[#009A49] hover:bg-[#008740] active:bg-[#007a39] text-white text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-xs disabled:opacity-70"
           >
             {isSubmitting ? (
               <>
-                <Loader2 size={14} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
                 <span>Logging in...</span>
               </>
             ) : (
@@ -131,13 +131,13 @@ export const LoginPage: React.FC = () => {
         </form>
 
         {user && (
-          <div className="mt-5 pt-4 border-t border-gray-100 text-center">
-            <span className="text-[11px] text-gray-400 block mb-1">
+          <div className="mt-6 pt-4 border-t border-gray-100 text-center">
+            <span className="text-xs text-gray-400 block mb-1">
               Active session: <span className="font-semibold text-gray-700">{user.email}</span>
             </span>
             <a
               href="/dashboard"
-              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition"
+              className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition"
             >
               Continue to Dashboard →
             </a>

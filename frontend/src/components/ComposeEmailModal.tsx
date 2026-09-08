@@ -247,29 +247,29 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border border-gray-200 p-6 flex flex-col"
+        className="bg-white w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border border-gray-200 p-7 sm:p-8 flex flex-col"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-gray-100">
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
+              className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition cursor-pointer"
               onClick={onClose}
               title="Back"
             >
-              <ArrowLeft size={18} />
+              <ArrowLeft size={20} />
             </button>
-            <h2 className="text-lg font-bold text-gray-900 m-0">Compose New Email</h2>
+            <h2 className="text-xl font-bold font-display text-gray-900 m-0">Compose New Email</h2>
           </div>
 
           <div className="flex items-center gap-4 relative">
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                className="p-1.5 text-gray-400 hover:text-gray-700 relative cursor-pointer"
+                className="p-2 text-gray-400 hover:text-gray-700 relative cursor-pointer rounded-lg hover:bg-gray-100 transition"
                 title={attachedFiles.length > 0 ? `Attachments (${attachedFiles.length})` : "Attach files"}
                 onClick={() => {
                   const input = document.createElement("input");
@@ -290,9 +290,9 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
                   input.click();
                 }}
               >
-                <Paperclip size={18} />
+                <Paperclip size={20} />
                 {attachedFiles.length > 0 && (
-                  <span className="absolute -top-0.5 -right-1 text-[10px] font-bold text-emerald-600">
+                  <span className="absolute 0 top-0.5 right-0.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded-full">
                     {attachedFiles.length}
                   </span>
                 )}
@@ -300,18 +300,18 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
 
               <button
                 type="button"
-                className="p-1.5 text-gray-400 hover:text-gray-700 cursor-pointer"
+                className="p-2 text-gray-400 hover:text-gray-700 cursor-pointer rounded-lg hover:bg-gray-100 transition"
                 title="Schedule Send"
                 onClick={() => setShowSendLaterPopover(!showSendLaterPopover)}
               >
-                <Clock size={18} />
+                <Clock size={20} />
               </button>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                className="bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold text-xs px-4 py-2 rounded-full transition cursor-pointer"
+                className="bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold text-sm px-5 py-2.5 rounded-full transition cursor-pointer"
                 onClick={() => setShowSendLaterPopover(!showSendLaterPopover)}
                 disabled={isSubmitting}
               >
@@ -320,15 +320,15 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
 
               <button
                 type="button"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-full inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center gap-2 transition cursor-pointer shadow-xs"
                 onClick={() => handleScheduleSubmit()}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin" />
                 ) : (
                   <>
-                    <Send size={14} />
+                    <Send size={15} />
                     <span>Send</span>
                   </>
                 )}
@@ -336,70 +336,70 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
             </div>
 
             {showSendLaterPopover && (
-              <div className="absolute top-full right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-4 z-50 animate-fade-in">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-gray-900 m-0">Send Later</h4>
+              <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl p-5 z-50 animate-fade-in">
+                <div className="flex items-center justify-between mb-3.5">
+                  <h4 className="text-[15px] font-bold text-gray-900 m-0">Send Later</h4>
                   <button
                     type="button"
-                    className="text-gray-400 hover:text-gray-600 cursor-pointer p-0.5"
+                    className="text-gray-400 hover:text-gray-600 cursor-pointer p-1"
                     onClick={() => setShowSendLaterPopover(false)}
                   >
-                    <X size={14} />
+                    <X size={16} />
                   </button>
                 </div>
 
-                <div className="mb-3 relative flex items-center">
+                <div className="mb-3.5 relative flex items-center">
                   <input
                     type="datetime-local"
-                    className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-emerald-500 pr-8"
+                    className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-emerald-500 pr-9 text-gray-700"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
                   />
-                  <Calendar size={15} className="absolute right-2.5 text-gray-400 pointer-events-none" />
+                  <Calendar size={16} className="absolute right-3 text-gray-400 pointer-events-none" />
                 </div>
 
-                <div className="flex flex-col gap-1 mb-4">
+                <div className="flex flex-col gap-1.5 mb-4">
                   <button
                     type="button"
-                    className="w-full text-left px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded-md cursor-pointer transition"
+                    className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg cursor-pointer transition font-medium"
                     onClick={() => handleSchedulePreset("tomorrow")}
                   >
                     Tomorrow
                   </button>
                   <button
                     type="button"
-                    className="w-full text-left px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded-md cursor-pointer transition"
+                    className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg cursor-pointer transition font-medium"
                     onClick={() => handleSchedulePreset("10am")}
                   >
                     Tomorrow, 10:00 AM
                   </button>
                   <button
                     type="button"
-                    className="w-full text-left px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded-md cursor-pointer transition"
+                    className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg cursor-pointer transition font-medium"
                     onClick={() => handleSchedulePreset("11am")}
                   >
                     Tomorrow, 11:00 AM
                   </button>
                   <button
                     type="button"
-                    className="w-full text-left px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded-md cursor-pointer transition"
+                    className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg cursor-pointer transition font-medium"
                     onClick={() => handleSchedulePreset("3pm")}
                   >
                     Tomorrow, 3:00 PM
                   </button>
                 </div>
 
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-end gap-2.5">
                   <button
                     type="button"
-                    className="text-xs text-gray-500 hover:text-gray-800 px-3 py-1 cursor-pointer"
+                    className="text-sm text-gray-500 hover:text-gray-800 px-3 py-1.5 cursor-pointer font-medium"
                     onClick={() => setShowSendLaterPopover(false)}
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
-                    className="border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold text-xs px-3.5 py-1 rounded-full cursor-pointer transition"
+                    className="border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold text-sm px-4 py-1.5 rounded-full cursor-pointer transition"
                     onClick={() => setShowSendLaterPopover(false)}
                   >
                     Done
@@ -411,24 +411,24 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
         </div>
 
         {submitError && (
-          <div className="flex items-center gap-2 p-2.5 mb-3 rounded-lg text-xs bg-red-50 border border-red-200 text-red-700 animate-fade-in">
-            <AlertCircle size={15} />
+          <div className="flex items-center gap-2.5 p-3 mb-3.5 rounded-xl text-sm bg-red-50 border border-red-200 text-red-700 animate-fade-in">
+            <AlertCircle size={17} />
             <span>{submitError}</span>
           </div>
         )}
         {submitSuccess && (
-          <div className="flex items-center gap-2 p-2.5 mb-3 rounded-lg text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 animate-fade-in">
-            <CheckCircle2 size={15} />
+          <div className="flex items-center gap-2.5 p-3 mb-3.5 rounded-xl text-sm bg-emerald-50 border border-emerald-200 text-emerald-700 animate-fade-in">
+            <CheckCircle2 size={17} />
             <span>{submitSuccess}</span>
           </div>
         )}
 
         <div className="flex flex-col">
-          <div className="flex items-center gap-4 py-2.5 border-b border-gray-100">
-            <label className="w-14 text-xs font-semibold text-gray-400">From</label>
-            <div className="inline-flex items-center bg-gray-50 border border-gray-200 rounded-full px-3 py-1 relative">
+          <div className="flex items-center gap-4 py-3 border-b border-gray-100">
+            <label className="w-16 text-sm font-semibold text-gray-500">From</label>
+            <div className="inline-flex items-center bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 relative">
               <select
-                className="appearance-none bg-transparent border-none text-xs font-medium text-gray-800 outline-none pr-5 cursor-pointer"
+                className="appearance-none bg-transparent border-none text-sm font-medium text-gray-800 outline-none pr-6 cursor-pointer"
                 value={senderId}
                 onChange={(e) => setSenderId(e.target.value)}
                 disabled={activeSenders.length === 0}
@@ -443,18 +443,18 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
                   ))
                 )}
               </select>
-              <ChevronDown size={13} className="absolute right-2.5 text-gray-400 pointer-events-none" />
+              <ChevronDown size={15} className="absolute right-3 text-gray-400 pointer-events-none" />
             </div>
           </div>
 
-          <div className="flex items-start gap-4 py-2.5 border-b border-gray-100">
-            <label className="w-14 text-xs font-semibold text-gray-400 pt-1">To</label>
+          <div className="flex items-start gap-4 py-3 border-b border-gray-100">
+            <label className="w-16 text-sm font-semibold text-gray-500 pt-1.5">To</label>
             <div className="flex-1 flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap flex-1">
                 {recipientsList.map((r) => (
                   <span
                     key={r}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-emerald-500 text-emerald-700 text-xs font-medium"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-emerald-500 text-emerald-700 text-xs font-semibold"
                   >
                     <span>{r}</span>
                     <button
@@ -462,14 +462,14 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
                       className="text-emerald-500 hover:text-emerald-800 p-0.5 cursor-pointer"
                       onClick={() => handleRemoveRecipient(r)}
                     >
-                      <X size={10} />
+                      <X size={12} />
                     </button>
                   </span>
                 ))}
 
                 <input
                   type="email"
-                  className="flex-1 min-w-[160px] border-none outline-none text-xs text-gray-800 placeholder:text-gray-400"
+                  className="flex-1 min-w-[200px] border-none outline-none text-sm text-gray-800 placeholder:text-gray-400 py-1"
                   placeholder={
                     recipientsList.length === 0
                       ? "recipient@example.com (comma or Enter to add)"
@@ -492,106 +492,108 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
                 />
                 <button
                   type="button"
-                  className="text-xs font-semibold text-emerald-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  className="text-sm font-semibold text-emerald-600 hover:underline inline-flex items-center gap-1.5 cursor-pointer py-1"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload size={13} />
+                  <Upload size={15} />
                   <span>Upload List</span>
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 py-2.5 border-b border-gray-100">
-            <label className="w-14 text-xs font-semibold text-gray-400">Subject</label>
+          <div className="flex items-center gap-4 py-3 border-b border-gray-100">
+            <label className="w-16 text-sm font-semibold text-gray-500">Subject</label>
             <input
               type="text"
-              className="flex-1 border-none outline-none text-sm text-gray-900 placeholder:text-gray-400 font-medium"
+              className="flex-1 border-none outline-none text-[15px] text-gray-900 placeholder:text-gray-400 font-medium py-1"
               placeholder="Subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
             />
           </div>
 
-          <div className="flex items-center gap-8 py-2.5 border-b border-gray-100 text-xs text-gray-600">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-8 py-3 border-b border-gray-100 text-sm text-gray-600">
+            <div className="flex items-center gap-2.5">
               <span>Delay between 2 emails</span>
               <input
                 type="number"
                 min="0"
-                className="w-14 h-8 bg-white border border-gray-200 rounded-lg text-center text-xs font-semibold text-gray-800 outline-none focus:border-emerald-500"
+                className="w-16 h-9 bg-white border border-gray-200 rounded-lg text-center text-sm font-semibold text-gray-800 outline-none focus:border-emerald-500"
                 placeholder="00"
                 value={delaySeconds}
                 onChange={(e) => setDelaySeconds(e.target.value)}
               />
+              <span className="text-xs text-gray-400 font-medium">sec</span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <span>Hourly Limit</span>
               <input
                 type="number"
                 min="1"
-                className="w-14 h-8 bg-white border border-gray-200 rounded-lg text-center text-xs font-semibold text-gray-800 outline-none focus:border-emerald-500"
+                className="w-16 h-9 bg-white border border-gray-200 rounded-lg text-center text-sm font-semibold text-gray-800 outline-none focus:border-emerald-500"
                 placeholder="00"
                 value={hourlyLimit}
                 onChange={(e) => setHourlyLimit(e.target.value)}
               />
+              <span className="text-xs text-gray-400 font-medium">emails/hr</span>
             </div>
           </div>
 
-          <div className="bg-gray-50/80 border border-gray-200/80 rounded-xl p-4 mt-3.5 flex flex-col">
+          <div className="bg-gray-50/80 border border-gray-200/80 rounded-2xl p-5 mt-4 flex flex-col">
             <textarea
-              className="w-full bg-transparent border-none outline-none text-sm text-gray-900 placeholder:text-gray-400 resize-none min-h-[170px] font-sans leading-relaxed"
+              className="w-full bg-transparent border-none outline-none text-[15px] text-gray-900 placeholder:text-gray-400 resize-none min-h-[190px] font-sans leading-relaxed"
               placeholder="Type Your Reply..."
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={8}
             />
 
-            <div className="bg-white border border-gray-200 rounded-full px-3.5 py-1.5 flex items-center gap-2 w-fit mt-3 shadow-xs">
-              <div className="flex items-center gap-1">
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Undo">
-                  <Undo size={13} />
+            <div className="bg-white border border-gray-200 rounded-full px-4 py-2 flex items-center gap-2.5 w-fit mt-3.5 shadow-xs">
+              <div className="flex items-center gap-1.5">
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Undo">
+                  <Undo size={15} />
                 </button>
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Redo">
-                  <Redo size={13} />
-                </button>
-              </div>
-
-              <div className="w-[1px] h-3.5 bg-gray-200" />
-
-              <div className="flex items-center gap-1">
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Font Style">
-                  <Type size={13} />
-                </button>
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer font-bold" title="Bold">
-                  <Bold size={13} />
-                </button>
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer italic" title="Italic">
-                  <Italic size={13} />
-                </button>
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer underline" title="Underline">
-                  <Underline size={13} />
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Redo">
+                  <Redo size={15} />
                 </button>
               </div>
 
-              <div className="w-[1px] h-3.5 bg-gray-200" />
+              <div className="w-[1px] h-4 bg-gray-200" />
 
-              <div className="flex items-center gap-1">
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Align">
-                  <AlignLeft size={13} />
+              <div className="flex items-center gap-1.5">
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Font Style">
+                  <Type size={15} />
                 </button>
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="List">
-                  <List size={13} />
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer font-bold" title="Bold">
+                  <Bold size={15} />
                 </button>
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Quote">
-                  <Quote size={13} />
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer italic" title="Italic">
+                  <Italic size={15} />
                 </button>
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Code">
-                  <Code size={13} />
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer underline" title="Underline">
+                  <Underline size={15} />
                 </button>
-                <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Strikethrough">
-                  <Strikethrough size={13} />
+              </div>
+
+              <div className="w-[1px] h-4 bg-gray-200" />
+
+              <div className="flex items-center gap-1.5">
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Align">
+                  <AlignLeft size={15} />
+                </button>
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="List">
+                  <List size={15} />
+                </button>
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Quote">
+                  <Quote size={15} />
+                </button>
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Code">
+                  <Code size={15} />
+                </button>
+                <button type="button" className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Strikethrough">
+                  <Strikethrough size={15} />
                 </button>
               </div>
             </div>
@@ -600,23 +602,23 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
           {attachedFiles.length > 0 && (
             <div className="flex gap-3 mt-4 flex-wrap">
               {attachedFiles.map((file, idx) => (
-                <div key={idx} className="w-36 bg-white border border-gray-200 rounded-lg overflow-hidden shadow-xs relative group">
+                <div key={idx} className="w-40 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs relative group">
                   <div className="w-full h-16 bg-gray-50 flex items-center justify-center text-gray-400 border-b border-gray-100">
                     <FileText size={24} className="text-gray-400" />
                   </div>
-                  <div className="p-2 flex flex-col">
-                    <span className="text-[11px] font-semibold text-gray-900 truncate">
+                  <div className="p-2.5 flex flex-col">
+                    <span className="text-xs font-semibold text-gray-900 truncate">
                       {file.name}
                     </span>
-                    <span className="text-[10px] text-gray-400">{file.size}</span>
+                    <span className="text-[11px] text-gray-400">{file.size}</span>
                   </div>
                   <button
                     type="button"
-                    className="absolute top-1 right-1 p-1 bg-white/90 hover:bg-white rounded-full text-gray-400 hover:text-rose-600 shadow-xs transition cursor-pointer"
+                    className="absolute top-1.5 right-1.5 p-1 bg-white/90 hover:bg-white rounded-full text-gray-400 hover:text-rose-600 shadow-xs transition cursor-pointer"
                     onClick={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))}
                     title="Remove attachment"
                   >
-                    <X size={12} />
+                    <X size={13} />
                   </button>
                 </div>
               ))}

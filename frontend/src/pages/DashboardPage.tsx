@@ -292,20 +292,20 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-white text-gray-900 font-sans antialiased overflow-x-hidden">
-      <aside className="w-60 flex-shrink-0 bg-white border-r border-gray-100 p-5 flex flex-col min-h-screen">
-        <div className="mb-6 pl-1">
+      <aside className="w-64 flex-shrink-0 bg-white border-r border-gray-100 p-5 flex flex-col min-h-screen">
+        <div className="mb-6 pl-1.5">
           <span className="text-3xl font-black font-display tracking-tight text-black leading-none select-none">
             ONB
           </span>
         </div>
 
-        <div className="relative mb-4">
+        <div className="relative mb-5">
           <button
             type="button"
-            className="w-full flex items-center gap-2.5 bg-gray-50 border border-gray-100 hover:border-gray-200 hover:bg-gray-100/80 rounded-xl p-2 cursor-pointer transition text-left"
+            className="w-full flex items-center gap-3 bg-gray-50 border border-gray-100 hover:border-gray-200 hover:bg-gray-100/80 rounded-xl p-2.5 cursor-pointer transition text-left"
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
           >
-            <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
+            <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
               {user?.avatar ? (
                 <img
                   src={user.avatar}
@@ -321,23 +321,23 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             <div className="flex-1 min-w-0 flex flex-col">
-              <span className="text-[13px] font-semibold text-gray-900 truncate leading-tight">
+              <span className="text-sm font-semibold text-gray-900 truncate leading-tight">
                 {user?.name || user?.email?.split("@")[0] || "Account"}
               </span>
-              <span className="text-[11px] text-gray-400 truncate leading-tight">
+              <span className="text-xs text-gray-500 truncate leading-tight mt-0.5">
                 {user?.email || "Signed In"}
               </span>
             </div>
 
-            <ChevronDown size={14} className="text-gray-400 flex-shrink-0 ml-auto" />
+            <ChevronDown size={15} className="text-gray-400 flex-shrink-0 ml-auto" />
           </button>
 
           {isUserMenuOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-50 animate-fade-in">
-              <div className="flex flex-col gap-0.5 text-xs pb-2 border-b border-gray-100">
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg p-3.5 z-50 animate-fade-in">
+              <div className="flex flex-col gap-1 text-sm pb-2.5 border-b border-gray-100">
                 <strong className="text-sm text-gray-900">{user?.name || "User"}</strong>
-                <span className="text-gray-400 truncate">{user?.email}</span>
-                <div className="inline-flex items-center gap-1.5 mt-1.5 text-[11px] text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md w-fit">
+                <span className="text-xs text-gray-500 truncate">{user?.email}</span>
+                <div className="inline-flex items-center gap-1.5 mt-1.5 text-xs text-gray-600 bg-gray-50 px-2.5 py-1 rounded-md w-fit">
                   <span
                     className={`w-1.5 h-1.5 rounded-full ${
                       dbStatus === "Connected" ? "bg-emerald-500" : "bg-red-500"
@@ -349,13 +349,13 @@ export const DashboardPage: React.FC = () => {
 
               <button
                 type="button"
-                className="w-full flex items-center gap-2 px-2 py-2 mt-1 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 transition cursor-pointer"
+                className="w-full flex items-center gap-2 px-2.5 py-2 mt-1.5 rounded-lg text-sm font-semibold text-red-600 hover:bg-red-50 transition cursor-pointer"
                 onClick={() => {
                   setIsUserMenuOpen(false);
                   logout();
                 }}
               >
-                <LogOut size={13} />
+                <LogOut size={15} />
                 <span>Sign Out</span>
               </button>
             </div>
@@ -366,7 +366,7 @@ export const DashboardPage: React.FC = () => {
           <button
             type="button"
             id="sidebar-compose-btn"
-            className="w-full py-2.5 rounded-full bg-white border-2 border-emerald-500 text-emerald-600 font-semibold text-sm hover:bg-emerald-50 hover:border-emerald-600 transition text-center shadow-xs cursor-pointer"
+            className="w-full py-3 rounded-full bg-white border-2 border-emerald-500 text-emerald-600 font-semibold text-[14.5px] hover:bg-emerald-50 hover:border-emerald-600 transition text-center shadow-xs cursor-pointer tracking-wide"
             onClick={() => setIsComposeOpen(true)}
           >
             Compose
@@ -374,7 +374,7 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         <div className="flex flex-col">
-          <span className="text-[11px] font-bold text-gray-400 tracking-wider uppercase mb-2 pl-1.5">
+          <span className="text-xs font-bold text-gray-400 tracking-wider uppercase mb-2.5 pl-2">
             CORE
           </span>
 
@@ -382,7 +382,7 @@ export const DashboardPage: React.FC = () => {
             <button
               type="button"
               id="nav-tab-scheduled"
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition text-left cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[14.5px] transition text-left cursor-pointer ${
                 activeTab === "scheduled"
                   ? "bg-emerald-50 text-emerald-800 font-semibold"
                   : "text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900"
@@ -392,13 +392,13 @@ export const DashboardPage: React.FC = () => {
                 setSelectedEmail(null);
               }}
             >
-              <div className="flex items-center gap-2.5">
-                <Clock size={16} className="flex-shrink-0" />
+              <div className="flex items-center gap-3">
+                <Clock size={18} className="flex-shrink-0" />
                 <span>Scheduled</span>
               </div>
               <span
-                className={`text-xs ${
-                  activeTab === "scheduled" ? "text-emerald-700 font-semibold" : "text-gray-400 font-normal"
+                className={`text-xs px-2.5 py-0.5 rounded-full ${
+                  activeTab === "scheduled" ? "bg-emerald-100 text-emerald-800 font-semibold" : "text-gray-400 font-normal"
                 }`}
               >
                 {scheduledCount}
@@ -408,7 +408,7 @@ export const DashboardPage: React.FC = () => {
             <button
               type="button"
               id="nav-tab-sent"
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition text-left cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[14.5px] transition text-left cursor-pointer ${
                 activeTab === "sent"
                   ? "bg-emerald-50 text-emerald-800 font-semibold"
                   : "text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900"
@@ -418,13 +418,13 @@ export const DashboardPage: React.FC = () => {
                 setSelectedEmail(null);
               }}
             >
-              <div className="flex items-center gap-2.5">
-                <Send size={16} className="flex-shrink-0" />
+              <div className="flex items-center gap-3">
+                <Send size={18} className="flex-shrink-0" />
                 <span>Sent</span>
               </div>
               <span
-                className={`text-xs ${
-                  activeTab === "sent" ? "text-emerald-700 font-semibold" : "text-gray-400 font-normal"
+                className={`text-xs px-2.5 py-0.5 rounded-full ${
+                  activeTab === "sent" ? "bg-emerald-100 text-emerald-800 font-semibold" : "text-gray-400 font-normal"
                 }`}
               >
                 {sentCount}
@@ -433,8 +433,8 @@ export const DashboardPage: React.FC = () => {
           </nav>
         </div>
 
-        <div className="flex flex-col mt-6">
-          <span className="text-[11px] font-bold text-gray-400 tracking-wider uppercase mb-2 pl-1.5">
+        <div className="flex flex-col mt-7">
+          <span className="text-xs font-bold text-gray-400 tracking-wider uppercase mb-2.5 pl-2">
             MANAGEMENT
           </span>
 
@@ -442,7 +442,7 @@ export const DashboardPage: React.FC = () => {
             <button
               type="button"
               id="nav-tab-senders"
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition text-left cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[14.5px] transition text-left cursor-pointer ${
                 activeTab === "senders"
                   ? "bg-emerald-50 text-emerald-800 font-semibold"
                   : "text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900"
@@ -452,13 +452,13 @@ export const DashboardPage: React.FC = () => {
                 setSelectedEmail(null);
               }}
             >
-              <div className="flex items-center gap-2.5">
-                <Users size={16} className="flex-shrink-0" />
+              <div className="flex items-center gap-3">
+                <Users size={18} className="flex-shrink-0" />
                 <span>Senders</span>
               </div>
               <span
-                className={`text-xs ${
-                  activeTab === "senders" ? "text-emerald-700 font-semibold" : "text-gray-400 font-normal"
+                className={`text-xs px-2.5 py-0.5 rounded-full ${
+                  activeTab === "senders" ? "bg-emerald-100 text-emerald-800 font-semibold" : "text-gray-400 font-normal"
                 }`}
               >
                 {activeSendersCount}
@@ -468,7 +468,7 @@ export const DashboardPage: React.FC = () => {
             <button
               type="button"
               id="nav-tab-slack"
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition text-left cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[14.5px] transition text-left cursor-pointer ${
                 activeTab === "slack"
                   ? "bg-emerald-50 text-emerald-800 font-semibold"
                   : "text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900"
@@ -478,13 +478,13 @@ export const DashboardPage: React.FC = () => {
                 setSelectedEmail(null);
               }}
             >
-              <div className="flex items-center gap-2.5">
-                <MessageSquare size={16} className="flex-shrink-0" />
+              <div className="flex items-center gap-3">
+                <MessageSquare size={18} className="flex-shrink-0" />
                 <span>Slack Alerts</span>
               </div>
               <span
-                className={`w-2 h-2 rounded-full ${
-                  slackStatus?.connected ? "bg-emerald-500 shadow-[0_0_6px_#10b981]" : "bg-gray-300"
+                className={`w-2.5 h-2.5 rounded-full ${
+                  slackStatus?.connected ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-gray-300"
                 }`}
               />
             </button>
@@ -492,63 +492,63 @@ export const DashboardPage: React.FC = () => {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 bg-white flex flex-col px-8 py-6 overflow-y-auto">
+      <main className="flex-1 min-w-0 bg-white flex flex-col px-8 lg:px-10 py-7 overflow-y-auto">
         {selectedEmail ? (
           <div className="w-full max-w-3xl animate-fade-in">
-            <div className="flex items-center justify-between pb-3.5 mb-5 border-b border-gray-100">
-              <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-gray-100">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-md transition cursor-pointer"
+                  className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition cursor-pointer"
                   onClick={() => setSelectedEmail(null)}
                   title="Back to list"
                 >
-                  <ArrowLeft size={18} />
+                  <ArrowLeft size={20} />
                 </button>
-                <h3 className="text-lg font-bold text-gray-900 m-0">
+                <h3 className="text-xl font-bold text-gray-900 m-0">
                   {selectedEmail.subject}
                 </h3>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
-                  className="p-1.5 text-gray-500 hover:text-amber-500 hover:bg-gray-100 rounded-md transition cursor-pointer"
+                  className="p-2 text-gray-500 hover:text-amber-500 hover:bg-gray-100 rounded-lg transition cursor-pointer"
                   title="Star"
                 >
-                  <Star size={17} />
+                  <Star size={18} />
                 </button>
                 <button
                   type="button"
-                  className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
+                  className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition cursor-pointer"
                   title="Archive"
                 >
-                  <Archive size={17} />
+                  <Archive size={18} />
                 </button>
                 <button
                   type="button"
-                  className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-md transition cursor-pointer"
+                  className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg transition cursor-pointer"
                   title="Delete"
                 >
-                  <Trash2 size={17} />
+                  <Trash2 size={18} />
                 </button>
-                <div className="w-7 h-7 rounded-full overflow-hidden ml-1.5 bg-emerald-600 text-white text-xs font-semibold flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full overflow-hidden ml-1.5 bg-emerald-600 text-white text-xs font-semibold flex items-center justify-center">
                   {user?.name?.charAt(0)?.toUpperCase() || "U"}
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-full bg-emerald-500 text-white font-bold text-base flex items-center justify-center flex-shrink-0">
+            <div className="flex items-center gap-3.5 mb-6">
+              <div className="w-11 h-11 rounded-full bg-emerald-500 text-white font-bold text-lg flex items-center justify-center flex-shrink-0">
                 {selectedEmail.recipientEmail.charAt(0).toUpperCase()}
               </div>
               <div className="flex flex-col flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-bold text-gray-900">
+                <div className="flex items-center gap-2">
+                  <span className="text-[15px] font-bold text-gray-900">
                     To: {selectedEmail.recipientEmail}
                   </span>
                   <span
-                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                    className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
                       selectedEmail.status === "SENT"
                         ? "bg-gray-100 text-gray-600"
                         : "bg-emerald-100 text-emerald-800"
@@ -557,14 +557,14 @@ export const DashboardPage: React.FC = () => {
                     {selectedEmail.status === "SENT" ? "Sent" : "Scheduled"}
                   </span>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-gray-500">
+                <div className="flex items-center gap-1 text-sm text-gray-500 mt-0.5">
                   <span>From: {user?.name || user?.email || "Me"}</span>
                 </div>
               </div>
-              <span className="text-xs text-gray-400">{selectedEmail.date || "Recently"}</span>
+              <span className="text-sm text-gray-400">{selectedEmail.date || "Recently"}</span>
             </div>
 
-            <div className="text-sm leading-relaxed text-gray-800 bg-gray-50/60 rounded-xl p-6 border border-gray-100 whitespace-pre-wrap font-sans">
+            <div className="text-[15px] leading-relaxed text-gray-800 bg-gray-50/60 rounded-2xl p-7 border border-gray-100 whitespace-pre-wrap font-sans">
               {selectedEmail.body ? (
                 selectedEmail.body
               ) : (
@@ -576,28 +576,28 @@ export const DashboardPage: React.FC = () => {
           <>
             <div className="flex items-center gap-3.5 mb-6">
               <div className="relative flex-1 max-w-2xl">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
                   type="text"
                   id="dashboard-search-input"
-                  className="w-full h-10 bg-gray-100/90 border border-transparent focus:border-gray-300 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 rounded-full pl-11 pr-5 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition"
+                  className="w-full h-11 bg-gray-100/90 border border-transparent focus:border-gray-300 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 rounded-full pl-11 pr-5 text-[14.5px] text-gray-900 placeholder:text-gray-400 outline-none transition"
                   placeholder="Search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                   title="Filter"
                 >
-                  <Filter size={17} />
+                  <Filter size={18} />
                 </button>
                 <button
                   type="button"
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                   title="Refresh"
                   onClick={() => {
                     fetchEmails();
@@ -605,7 +605,7 @@ export const DashboardPage: React.FC = () => {
                     fetchEmailCounts();
                   }}
                 >
-                  <RotateCw size={17} className={isLoadingEmails ? "animate-spin" : ""} />
+                  <RotateCw size={18} className={isLoadingEmails ? "animate-spin" : ""} />
                 </button>
               </div>
             </div>
@@ -641,18 +641,18 @@ export const DashboardPage: React.FC = () => {
                     {displayedEmails.map((email) => (
                       <div
                         key={email.id}
-                        className="flex items-center px-4 py-3 border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer gap-4 rounded-lg"
+                        className="flex items-center px-5 py-3.5 border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer gap-4 rounded-xl"
                         onClick={() => setSelectedEmail(email)}
                       >
-                        <div className="w-44 flex-shrink-0 font-semibold text-sm text-gray-900 truncate">
+                        <div className="w-48 flex-shrink-0 font-semibold text-[14.5px] text-gray-900 truncate">
                           <span>To: {email.recipientEmail}</span>
                         </div>
 
                         <div className="flex-shrink-0">
                           <span
-                            className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                            className={`text-xs font-semibold px-3 py-0.5 rounded-full ${
                               email.status === "SENT"
-                                ? "bg-gray-100 text-gray-600"
+                                ? "bg-gray-100 text-gray-700"
                                 : "bg-emerald-100 text-emerald-800"
                             }`}
                           >
@@ -660,7 +660,7 @@ export const DashboardPage: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="flex-1 min-w-0 flex items-center gap-1.5 truncate text-[13.5px]">
+                        <div className="flex-1 min-w-0 flex items-center gap-2 truncate text-[14.5px]">
                           <span className="font-semibold text-gray-900 flex-shrink-0">
                             {email.subject}
                           </span>
@@ -677,12 +677,12 @@ export const DashboardPage: React.FC = () => {
                         >
                           <button
                             type="button"
-                            className={`p-1 text-gray-300 hover:text-amber-400 transition cursor-pointer ${
+                            className={`p-1.5 text-gray-300 hover:text-amber-400 transition cursor-pointer ${
                               email.starred ? "text-amber-400" : ""
                             }`}
                             title="Star email"
                           >
-                            <Star size={16} fill={email.starred ? "#f59e0b" : "none"} />
+                            <Star size={18} fill={email.starred ? "#f59e0b" : "none"} />
                           </button>
                         </div>
                       </div>
