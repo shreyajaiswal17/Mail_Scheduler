@@ -295,7 +295,7 @@ export const DashboardPage: React.FC = () => {
       <aside className="w-60 flex-shrink-0 bg-white border-r border-gray-100 p-5 flex flex-col min-h-screen">
         <div className="mb-6 pl-1">
           <span className="text-3xl font-black tracking-tighter text-black leading-none select-none">
-            ONG
+            ONB
           </span>
         </div>
 
