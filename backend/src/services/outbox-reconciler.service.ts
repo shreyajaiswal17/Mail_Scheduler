@@ -289,10 +289,10 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
       }
     }
 
-    // 3. Reconcile Elasticsearch dirty queue and missing index records
+    // 3. Reconcile durable SearchOutbox and Elasticsearch dirty queue
     try {
       const esReport = await reconcileElasticsearch();
-      report.elasticsearchSynced = esReport.syncedDirty;
+      report.elasticsearchSynced = esReport.syncedOutbox + esReport.syncedRedis;
       report.elasticsearchBackfilled = esReport.backfilled;
     } catch (esErr: any) {
       console.warn("[Reconciler] Non-blocking ES reconciliation error:", esErr.message);

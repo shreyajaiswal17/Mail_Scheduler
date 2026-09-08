@@ -195,6 +195,15 @@ export const scheduleEmails = async (
         })),
       });
 
+      // Atomically persist search indexing intent (Durable Search Outbox)
+      await tx.searchOutbox.createMany({
+        data: newCampaign.emails.map((email) => ({
+          emailId: email.id,
+          status: "PENDING",
+        })),
+        skipDuplicates: true,
+      });
+
       return newCampaign;
     });
 
