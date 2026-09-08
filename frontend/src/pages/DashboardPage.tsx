@@ -580,12 +580,8 @@ export const DashboardPage: React.FC = () => {
                 >
                   <Trash2 size={17} />
                 </button>
-                <div className="w-7 h-7 rounded-full overflow-hidden ml-1.5 bg-gray-200">
-                  <img
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                    alt="User"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="w-7 h-7 rounded-full overflow-hidden ml-1.5 bg-emerald-600 text-white text-xs font-semibold flex items-center justify-center">
+                  {user?.name?.charAt(0)?.toUpperCase() || "U"}
                 </div>
               </div>
             </div>
@@ -634,40 +630,7 @@ export const DashboardPage: React.FC = () => {
                 P.S. Always remember that you can develop world class technique! 🚀
               </p>
 
-              {/* Attachments Cards in Detail View */}
-              <div className="flex gap-3.5 mt-6 flex-wrap">
-                <div className="w-44 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
-                  <div className="w-full h-24 bg-sky-600 overflow-hidden">
-                    <img
-                      src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=300&auto=format&fit=crop&q=80"
-                      alt="Tennis_Coach_Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-2 flex flex-col">
-                    <span className="text-xs font-semibold text-gray-900 truncate">
-                      Tennis_Coach_Profile.png
-                    </span>
-                    <span className="text-[11px] text-gray-400">1.2 MB</span>
-                  </div>
-                </div>
 
-                <div className="w-44 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
-                  <div className="w-full h-24 bg-sky-600 overflow-hidden">
-                    <img
-                      src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=300&auto=format&fit=crop&q=80"
-                      alt="Tennis_Coach_Profile2"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-2 flex flex-col">
-                    <span className="text-xs font-semibold text-gray-900 truncate">
-                      Tennis_Coach_Profile2.png
-                    </span>
-                    <span className="text-[11px] text-gray-400">1.2 MB</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         ) : (

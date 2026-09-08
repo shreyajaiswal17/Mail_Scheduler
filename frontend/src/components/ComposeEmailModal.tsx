@@ -22,6 +22,7 @@ import {
   Code,
   Strikethrough,
   ChevronDown,
+  FileText,
 } from "lucide-react";
 
 export interface Sender {
@@ -83,9 +84,7 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
-  const [attachedFiles] = useState<Array<{ name: string; size: string }>>([
-    { name: "Tennis_Coach_Profile.png", size: "1.2 MB" },
-  ]);
+  const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; size: string }>>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -273,13 +272,32 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
               <button
                 type="button"
                 className="p-1.5 text-gray-400 hover:text-gray-700 relative cursor-pointer"
-                title="Attachments (1)"
-                onClick={() => alert("Attached: Tennis_Coach_Profile.png (1.2 MB)")}
+                title={attachedFiles.length > 0 ? `Attachments (${attachedFiles.length})` : "Attach files"}
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.multiple = true;
+                  input.onchange = (e: any) => {
+                    const files = Array.from(e.target.files || []) as File[];
+                    if (files.length > 0) {
+                      setAttachedFiles((prev) => [
+                        ...prev,
+                        ...files.map((f) => ({
+                          name: f.name,
+                          size: `${(f.size / (1024 * 1024)).toFixed(1)} MB`,
+                        })),
+                      ]);
+                    }
+                  };
+                  input.click();
+                }}
               >
                 <Paperclip size={18} />
-                <span className="absolute -top-0.5 -right-1 text-[10px] font-bold text-emerald-600">
-                  1
-                </span>
+                {attachedFiles.length > 0 && (
+                  <span className="absolute -top-0.5 -right-1 text-[10px] font-bold text-emerald-600">
+                    {attachedFiles.length}
+                  </span>
+                )}
               </button>
 
               <button
@@ -592,22 +610,26 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
 
           {/* Attached Files Preview */}
           {attachedFiles.length > 0 && (
-            <div className="flex gap-3 mt-4">
+            <div className="flex gap-3 mt-4 flex-wrap">
               {attachedFiles.map((file, idx) => (
-                <div key={idx} className="w-36 bg-white border border-gray-200 rounded-lg overflow-hidden shadow-xs">
-                  <div className="w-full h-20 bg-sky-600 overflow-hidden">
-                    <img
-                      src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=200&auto=format&fit=crop&q=80"
-                      alt={file.name}
-                      className="w-full h-full object-cover"
-                    />
+                <div key={idx} className="w-36 bg-white border border-gray-200 rounded-lg overflow-hidden shadow-xs relative group">
+                  <div className="w-full h-16 bg-gray-50 flex items-center justify-center text-gray-400 border-b border-gray-100">
+                    <FileText size={24} className="text-gray-400" />
                   </div>
-                  <div className="p-1.5 flex flex-col">
+                  <div className="p-2 flex flex-col">
                     <span className="text-[11px] font-semibold text-gray-900 truncate">
                       {file.name}
                     </span>
                     <span className="text-[10px] text-gray-400">{file.size}</span>
                   </div>
+                  <button
+                    type="button"
+                    className="absolute top-1 right-1 p-1 bg-white/90 hover:bg-white rounded-full text-gray-400 hover:text-rose-600 shadow-xs transition cursor-pointer"
+                    onClick={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))}
+                    title="Remove attachment"
+                  >
+                    <X size={12} />
+                  </button>
                 </div>
               ))}
             </div>
