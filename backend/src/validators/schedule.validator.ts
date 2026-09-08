@@ -8,6 +8,7 @@ export const scheduleSchema = z.object({
   startTime: z.iso.datetime({ offset: true }),
   delayMs: z.number().int().min(0),
   hourlyLimit: z.number().int().positive(),
+  idempotencyKey: z.string().trim().min(1).max(255).optional(),
 });
 
 export type ScheduleInput = z.infer<typeof scheduleSchema>;

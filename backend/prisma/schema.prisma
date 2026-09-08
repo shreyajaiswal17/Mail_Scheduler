@@ -13,6 +13,13 @@ enum EmailStatus {
   SENT
   FAILED
   RATE_LIMITED
+  NEEDS_REVIEW
+}
+
+enum OutboxStatus {
+  PENDING
+  DISPATCHED
+  FAILED
 }
 
 model User {
@@ -52,7 +59,8 @@ model EmailCampaign {
   id             String   @id @default(uuid())
   userId         String
   senderId       String
-  idempotencyKey String?  @unique
+  idempotencyKey String?
+  payloadHash    String?
   subject        String
   body           String   @db.Text
   startTime      DateTime
@@ -63,30 +71,51 @@ model EmailCampaign {
   user   User       @relation(fields: [userId], references: [id])
   sender Sender     @relation(fields: [senderId], references: [id])
   emails EmailJob[]
+
+  @@unique([userId, idempotencyKey])
 }
 
 model EmailJob {
-  id             String      @id @default(uuid())
-  campaignId     String
-  senderId       String
-  recipientEmail String
-  subject        String
-  body           String      @db.Text
-  scheduledAt    DateTime
-  sentAt         DateTime?
-  status         EmailStatus @default(SCHEDULED)
-  bullmqJobId    String?     @unique
-  attempts       Int         @default(0)
-  messageId      String?
-  errorMessage   String?     @db.Text
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id                   String      @id @default(uuid())
+  campaignId           String
+  senderId             String
+  recipientEmail       String
+  subject              String
+  body                 String      @db.Text
+  scheduledAt          DateTime
+  nextEligibleAt       DateTime?
+  sentAt               DateTime?
+  status               EmailStatus @default(SCHEDULED)
+  bullmqJobId          String?     @unique
+  attempts             Int         @default(0)
+  messageId            String?
+  errorMessage         String?     @db.Text
+  claimToken           String?
+  leaseExpiresAt       DateTime?
+  smtpAttemptStartedAt DateTime?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
 
   campaign EmailCampaign @relation(fields: [campaignId], references: [id])
   sender   Sender        @relation(fields: [senderId], references: [id])
 
   @@index([status, scheduledAt])
+  @@index([status, nextEligibleAt])
+  @@index([status, leaseExpiresAt])
   @@index([senderId, scheduledAt])
+}
+
+model OutboxEvent {
+  id         String       @id @default(uuid())
+  eventType  String       @default("SEND_EMAIL")
+  jobId      String       @unique
+  payload    Json
+  status     OutboxStatus @default(PENDING)
+  retryCount Int          @default(0)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([status, createdAt])
 }
 
 model SlackConnection {

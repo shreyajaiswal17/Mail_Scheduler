@@ -1,8 +1,12 @@
 import { Response } from "express";
+import crypto from "crypto";
 import { prisma } from "../lib/prisma";
 import { AuthenticatedRequest } from "../middlewares/auth.middleware";
 import { scheduleSchema } from "../validators/schedule.validator";
-import { emailQueue } from "../queues/email.queue";
+import {
+  dispatchOutboxBatch,
+  reconcileDatabaseToQueue,
+} from "../services/outbox-reconciler.service";
 
 export const scheduleEmails = async (
   req: AuthenticatedRequest,
@@ -36,6 +40,13 @@ export const scheduleEmails = async (
       hourlyLimit,
     } = parsed.data;
 
+    // 1. Extract and normalize Idempotency Key (header takes precedence, body fallback)
+    const headerKey =
+      (req.headers["idempotency-key"] as string) ||
+      (req.headers["x-idempotency-key"] as string);
+    const idempotencyKey =
+      (headerKey || parsed.data.idempotencyKey || "").trim() || null;
+
     const sender = await prisma.sender.findFirst({
       where: {
         id: senderId,
@@ -51,55 +62,148 @@ export const scheduleEmails = async (
       return;
     }
 
+    // Sort unique recipients for deterministic payload hashing
     const uniqueRecipients = [
       ...new Set(recipients.map((email) => email.trim().toLowerCase())),
-    ];
+    ].sort();
 
     const start = new Date(startTime);
 
-    const campaign = await prisma.emailCampaign.create({
-      data: {
-        userId,
-        senderId,
-        subject,
-        body,
-        startTime: start,
-        delayMs,
-        hourlyLimit,
-        emails: {
-          create: uniqueRecipients.map((recipientEmail, index) => ({
-            senderId,
-            recipientEmail,
-            subject,
-            body,
-            scheduledAt: new Date(start.getTime() + index * delayMs),
-            status: "SCHEDULED",
-          })),
-        },
-      },
-      include: {
-        emails: {
-          select: {
-            id: true,
-            recipientEmail: true,
-            scheduledAt: true,
-            status: true,
+    // 2. Compute canonical payload fingerprint
+    const canonicalPayload = JSON.stringify({
+      senderId,
+      subject,
+      body,
+      startTime: start.toISOString(),
+      delayMs,
+      hourlyLimit,
+      recipients: uniqueRecipients,
+    });
+    const payloadHash = crypto
+      .createHash("sha256")
+      .update(canonicalPayload)
+      .digest("hex");
+
+    // 3. User-Scoped Idempotency Check
+    if (idempotencyKey) {
+      const existingCampaign = await prisma.emailCampaign.findUnique({
+        where: {
+          userId_idempotencyKey: {
+            userId,
+            idempotencyKey,
           },
         },
-      },
+        include: {
+          emails: {
+            select: {
+              id: true,
+              recipientEmail: true,
+              scheduledAt: true,
+              status: true,
+            },
+            orderBy: { scheduledAt: "asc" },
+          },
+        },
+      });
+
+      if (existingCampaign) {
+        // Check if payload matches
+        const isMatch =
+          existingCampaign.payloadHash === payloadHash ||
+          (existingCampaign.senderId === senderId &&
+            existingCampaign.subject === subject &&
+            existingCampaign.body === body &&
+            existingCampaign.delayMs === delayMs &&
+            existingCampaign.hourlyLimit === hourlyLimit &&
+            Math.abs(existingCampaign.startTime.getTime() - start.getTime()) <
+              1000);
+
+        if (!isMatch) {
+          res.status(409).json({
+            message:
+              "Idempotency key conflict: This key was previously used with a different request payload",
+          });
+          return;
+        }
+
+        // Idempotent replay: ensure any pending outbox events are dispatched
+        await dispatchOutboxBatch();
+
+        res.status(200).json({
+          message: "Emails scheduled successfully",
+          campaignId: existingCampaign.id,
+          totalEmails: existingCampaign.emails.length,
+          emails: existingCampaign.emails,
+          idempotent: true,
+        });
+        return;
+      }
+    }
+
+    // 4. Atomic PostgreSQL Transaction: Persist Campaign, EmailJobs, and Enqueue Intent (Outbox)
+    const campaign = await prisma.$transaction(async (tx) => {
+      const newCampaign = await tx.emailCampaign.create({
+        data: {
+          userId,
+          senderId,
+          idempotencyKey,
+          payloadHash,
+          subject,
+          body,
+          startTime: start,
+          delayMs,
+          hourlyLimit,
+          emails: {
+            create: uniqueRecipients.map((recipientEmail, index) => {
+              const scheduledAt = new Date(start.getTime() + index * delayMs);
+              return {
+                senderId,
+                recipientEmail,
+                subject,
+                body,
+                scheduledAt, // Preserved permanently as original schedule time
+                nextEligibleAt: scheduledAt, // Rate-limit adjusted eligible time
+                status: "SCHEDULED",
+              };
+            }),
+          },
+        },
+        include: {
+          emails: {
+            select: {
+              id: true,
+              recipientEmail: true,
+              scheduledAt: true,
+              status: true,
+            },
+            orderBy: { scheduledAt: "asc" },
+          },
+        },
+      });
+
+      // Atomically persist enqueue intent (Transactional Outbox)
+      await tx.outboxEvent.createMany({
+        data: newCampaign.emails.map((email) => ({
+          eventType: "SEND_EMAIL",
+          jobId: email.id, // Stable BullMQ job ID matching EmailJob.id
+          payload: {
+            emailId: email.id,
+            campaignId: newCampaign.id,
+          },
+          status: "PENDING",
+        })),
+      });
+
+      return newCampaign;
     });
 
-    await emailQueue.addBulk(
-      campaign.emails.map((email) => ({
-        name: "send-email",
-        data: {
-          emailId: email.id,
-        },
-        opts: {
-          jobId: email.id,
-          delay: Math.max(0, email.scheduledAt.getTime() - Date.now()),
-        },
-      }))
+    // 5. Post-Commit Outbox Dispatch to BullMQ
+    // Dispatches newly committed outbox events to BullMQ with stable job IDs
+    await dispatchOutboxBatch();
+
+    // 6. Opportunistic Reconciliation without cron (non-blocking)
+    reconcileDatabaseToQueue().catch((err) =>
+      console.error("[Schedule Controller] Background reconciliation error:", err)
     );
 
     res.status(201).json({
@@ -108,7 +212,55 @@ export const scheduleEmails = async (
       totalEmails: campaign.emails.length,
       emails: campaign.emails,
     });
-  } catch (error) {
+  } catch (error: any) {
+    // Concurrent race condition handling for unique constraint on (userId, idempotencyKey)
+    if (
+      error.code === "P2002" &&
+      req.user?.id &&
+      (req.headers["idempotency-key"] || req.body?.idempotencyKey)
+    ) {
+      try {
+        const idempotencyKey = (
+          (req.headers["idempotency-key"] as string) ||
+          (req.headers["x-idempotency-key"] as string) ||
+          req.body.idempotencyKey ||
+          ""
+        ).trim();
+
+        const existing = await prisma.emailCampaign.findUnique({
+          where: {
+            userId_idempotencyKey: {
+              userId: req.user.id,
+              idempotencyKey,
+            },
+          },
+          include: {
+            emails: {
+              select: {
+                id: true,
+                recipientEmail: true,
+                scheduledAt: true,
+                status: true,
+              },
+            },
+          },
+        });
+
+        if (existing) {
+          res.status(200).json({
+            message: "Emails scheduled successfully",
+            campaignId: existing.id,
+            totalEmails: existing.emails.length,
+            emails: existing.emails,
+            idempotent: true,
+          });
+          return;
+        }
+      } catch (innerErr) {
+        console.error("Failed to resolve concurrent idempotency race:", innerErr);
+      }
+    }
+
     console.error("Failed to schedule emails:", error);
 
     res.status(500).json({
@@ -116,3 +268,4 @@ export const scheduleEmails = async (
     });
   }
 };
+
