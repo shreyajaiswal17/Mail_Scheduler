@@ -1,9 +1,8 @@
-
 import { prisma } from "../lib/prisma";
 import { emailQueue } from "../queues/email.queue";
 import { reconcileElasticsearch, indexEmailJob } from "./elasticsearch.service";
 
-const LEASE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const LEASE_TIMEOUT_MS = 5 * 60 * 1000;
 
 export interface ReconciliationReport {
   dispatchedOutboxCount: number;
@@ -14,10 +13,6 @@ export interface ReconciliationReport {
   elasticsearchBackfilled?: number;
 }
 
-/**
- * Dispatches a batch of PENDING outbox events to BullMQ using stable job IDs.
- * Strictly guarantees that SENT emails are NEVER re-enqueued.
- */
 export async function dispatchOutboxBatch(
   outboxEventIds?: string[]
 ): Promise<number> {
@@ -65,14 +60,11 @@ export async function dispatchOutboxBatch(
     const job = emailJobMap.get(event.jobId);
 
     if (!job) {
-      // Record not found in EmailJob table; mark outbox as failed
       failedEventIds.push(event.id);
       continue;
     }
 
     if (job.status === "SENT" || job.messageId) {
-      // Email was already confirmed sent!
-      // [SAFETY GUARANTEE]: NEVER blindly re-enqueue SENT emails.
       dispatchedEventIds.push(event.id);
       continue;
     }
@@ -82,7 +74,6 @@ export async function dispatchOutboxBatch(
       continue;
     }
 
-    // Status is SCHEDULED, RATE_LIMITED, or PROCESSING
     const effectiveScheduleTime = (job.nextEligibleAt || job.scheduledAt).getTime();
     const delay = Math.max(0, effectiveScheduleTime - now);
 
@@ -90,7 +81,7 @@ export async function dispatchOutboxBatch(
       name: "send-email",
       data: { emailId: job.id },
       opts: {
-        jobId: job.id, // Stable BullMQ job ID matching EmailJob.id
+        jobId: job.id,
         delay,
       },
     });
@@ -98,12 +89,10 @@ export async function dispatchOutboxBatch(
     dispatchedEventIds.push(event.id);
   }
 
-  // 1. Dispatch to BullMQ atomically in bulk
   if (jobsToEnqueue.length > 0) {
     await emailQueue.addBulk(jobsToEnqueue);
   }
 
-  // 2. Mark Outbox Events as DISPATCHED in PostgreSQL
   if (dispatchedEventIds.length > 0) {
     await prisma.outboxEvent.updateMany({
       where: { id: { in: dispatchedEventIds } },
@@ -127,8 +116,6 @@ export async function dispatchOutboxBatch(
   return jobsToEnqueue.length;
 }
 
-// Reconciles database state with BullMQ without cron.
-// Reclaims unattempted jobs, resolves confirmed sends, and marks ambiguous attempts for review.
 export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> {
   const report: ReconciliationReport = {
     dispatchedOutboxCount: 0,
@@ -138,11 +125,8 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
   };
 
   try {
-    // 1. Dispatch any orphaned PENDING OutboxEvent records
     report.dispatchedOutboxCount = await dispatchOutboxBatch();
 
-    // 2. Safe Stale Lease Recovery:
-    // Find jobs stuck in PROCESSING where lease has expired
     const now = new Date();
     const staleThreshold = new Date(Date.now() - LEASE_TIMEOUT_MS);
 
@@ -173,7 +157,6 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
       }> = [];
 
       for (const stale of staleJobs) {
-        // Case 1: Send completed and captured messageId before crashing
         if (stale.messageId || stale.sentAt) {
           console.log(
             `[Reconciler] Resolving stale job ${stale.id} to SENT (messageId: ${stale.messageId})`
@@ -190,8 +173,6 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
           continue;
         }
 
-        // Case 2: Process crashed BEFORE initiating SMTP dispatch
-        // smtpAttemptStartedAt is null -> It is 100% certain SMTP was never called.
         if (!stale.smtpAttemptStartedAt) {
           console.log(
             `[Reconciler] Reclaiming stale job ${stale.id} (never reached SMTP). Resetting to SCHEDULED.`
@@ -220,11 +201,8 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
           continue;
         }
 
-        // Case 3: Process crashed AFTER initiating SMTP dispatch (smtpAttemptStartedAt is set)
-        // Outcome is AMBIGUOUS: SMTP may have delivered the email before crash.
-        // [CONSERVATIVE POLICY]: DO NOT automatically resend! Mark as NEEDS_REVIEW.
         console.warn(
-          `[Conservative Crash Recovery] Job ${stale.id} initiated SMTP at ${stale.smtpAttemptStartedAt.toISOString()} but worker crashed before messageId confirmation. Marking NEEDS_REVIEW to prevent duplicate sends.`
+          `[Crash Recovery] Job ${stale.id} initiated SMTP at ${stale.smtpAttemptStartedAt.toISOString()} but worker crashed before confirmation. Marking NEEDS_REVIEW.`
         );
 
         await prisma.emailJob.update({
@@ -233,7 +211,7 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
             status: "NEEDS_REVIEW",
             claimToken: null,
             leaseExpiresAt: null,
-            errorMessage: `Ambiguous delivery: Worker crashed after SMTP dispatch started at ${stale.smtpAttemptStartedAt.toISOString()}. Outcome unknown. Manual review required to avoid duplicate send.`,
+            errorMessage: `Worker crashed after SMTP dispatch started at ${stale.smtpAttemptStartedAt.toISOString()}. Manual review required.`,
             updatedAt: new Date(),
           },
         });
@@ -245,7 +223,6 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
       }
     }
 
-    // 3. Reconcile unenqueued SCHEDULED/RATE_LIMITED jobs
     const unenqueued = await prisma.emailJob.findMany({
       where: {
         status: { in: ["SCHEDULED", "RATE_LIMITED"] },
@@ -275,7 +252,6 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
 
         await emailQueue.addBulk(jobsToEnqueue);
 
-        // Create OutboxEvent records as DISPATCHED for audit trail
         await prisma.outboxEvent.createMany({
           data: missingJobs.map((j) => ({
             jobId: j.id,
@@ -289,7 +265,6 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
       }
     }
 
-    // 3. Reconcile durable SearchOutbox and Elasticsearch dirty queue
     try {
       const esReport = await reconcileElasticsearch();
       report.elasticsearchSynced = esReport.syncedOutbox + esReport.syncedRedis;
@@ -304,13 +279,6 @@ export async function reconcileDatabaseToQueue(): Promise<ReconciliationReport> 
   return report;
 }
 
-/**
- * Administrative resolution utility for ambiguous jobs in NEEDS_REVIEW status.
- *
- * @param emailId The EmailJob ID in NEEDS_REVIEW status.
- * @param resolution 'MARK_SENT' if recipient confirmed receipt, or 'FORCE_RESEND' if confirmed unreceived.
- * @param adminMessageId Optional SMTP message ID if verified via mail server logs.
- */
 export async function resolveAmbiguousEmail(
   emailId: string,
   resolution: "MARK_SENT" | "FORCE_RESEND",
@@ -370,4 +338,3 @@ export async function resolveAmbiguousEmail(
 
   throw new Error(`Invalid resolution action: ${resolution}`);
 }
-

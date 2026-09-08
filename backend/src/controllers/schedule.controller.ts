@@ -41,7 +41,6 @@ export const scheduleEmails = async (
       hourlyLimit,
     } = parsed.data;
 
-    // 1. Extract and normalize Idempotency Key (header takes precedence, body fallback)
     const headerKey =
       (req.headers["idempotency-key"] as string) ||
       (req.headers["x-idempotency-key"] as string);
@@ -63,14 +62,12 @@ export const scheduleEmails = async (
       return;
     }
 
-    // Sort unique recipients for deterministic payload hashing
     const uniqueRecipients = [
       ...new Set(recipients.map((email) => email.trim().toLowerCase())),
     ].sort();
 
     const start = new Date(startTime);
 
-    // 2. Compute canonical payload fingerprint
     const canonicalPayload = JSON.stringify({
       senderId,
       subject,
@@ -85,7 +82,6 @@ export const scheduleEmails = async (
       .update(canonicalPayload)
       .digest("hex");
 
-    // 3. User-Scoped Idempotency Check
     if (idempotencyKey) {
       const existingCampaign = await prisma.emailCampaign.findUnique({
         where: {
@@ -108,7 +104,6 @@ export const scheduleEmails = async (
       });
 
       if (existingCampaign) {
-        // Check if payload matches
         const isMatch =
           existingCampaign.payloadHash === payloadHash ||
           (existingCampaign.senderId === senderId &&
@@ -116,8 +111,7 @@ export const scheduleEmails = async (
             existingCampaign.body === body &&
             existingCampaign.delayMs === delayMs &&
             existingCampaign.hourlyLimit === hourlyLimit &&
-            Math.abs(existingCampaign.startTime.getTime() - start.getTime()) <
-              1000);
+            Math.abs(existingCampaign.startTime.getTime() - start.getTime()) < 1000);
 
         if (!isMatch) {
           res.status(409).json({
@@ -127,7 +121,6 @@ export const scheduleEmails = async (
           return;
         }
 
-        // Idempotent replay: ensure any pending outbox events are dispatched
         await dispatchOutboxBatch();
 
         res.status(200).json({
@@ -141,7 +134,6 @@ export const scheduleEmails = async (
       }
     }
 
-    // 4. Atomic PostgreSQL Transaction: Persist Campaign, EmailJobs, and Enqueue Intent (Outbox)
     const campaign = await prisma.$transaction(async (tx) => {
       const newCampaign = await tx.emailCampaign.create({
         data: {
@@ -162,8 +154,8 @@ export const scheduleEmails = async (
                 recipientEmail,
                 subject,
                 body,
-                scheduledAt, // Preserved permanently as original schedule time
-                nextEligibleAt: scheduledAt, // Rate-limit adjusted eligible time
+                scheduledAt,
+                nextEligibleAt: scheduledAt,
                 status: "SCHEDULED",
               };
             }),
@@ -182,11 +174,10 @@ export const scheduleEmails = async (
         },
       });
 
-      // Atomically persist enqueue intent (Transactional Outbox)
       await tx.outboxEvent.createMany({
         data: newCampaign.emails.map((email) => ({
           eventType: "SEND_EMAIL",
-          jobId: email.id, // Stable BullMQ job ID matching EmailJob.id
+          jobId: email.id,
           payload: {
             emailId: email.id,
             campaignId: newCampaign.id,
@@ -195,7 +186,6 @@ export const scheduleEmails = async (
         })),
       });
 
-      // Atomically persist search indexing intent (Durable Search Outbox)
       await tx.searchOutbox.createMany({
         data: newCampaign.emails.map((email) => ({
           emailId: email.id,
@@ -207,15 +197,12 @@ export const scheduleEmails = async (
       return newCampaign;
     });
 
-    // 5. Post-Commit Outbox Dispatch to BullMQ
     await dispatchOutboxBatch();
 
-    // Trigger non-blocking Elasticsearch indexing (outage resilient)
     indexEmailJobsBatch(campaign.emails.map((e) => e.id)).catch((err) =>
       console.warn("[Schedule Controller] Non-blocking ES indexing error:", err.message)
     );
 
-    // 6. Opportunistic Reconciliation without cron (non-blocking)
     reconcileDatabaseToQueue().catch((err) =>
       console.error("[Schedule Controller] Background reconciliation error:", err)
     );
@@ -227,7 +214,6 @@ export const scheduleEmails = async (
       emails: campaign.emails,
     });
   } catch (error: any) {
-    // Concurrent race condition handling for unique constraint on (userId, idempotencyKey)
     if (
       error.code === "P2002" &&
       req.user?.id &&
@@ -282,4 +268,3 @@ export const scheduleEmails = async (
     });
   }
 };
-

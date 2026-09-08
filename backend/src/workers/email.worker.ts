@@ -9,23 +9,19 @@ import { reconcileDatabaseToQueue } from "../services/outbox-reconciler.service"
 import { indexEmailJob } from "../services/elasticsearch.service";
 
 const concurrency = Number(process.env.WORKER_CONCURRENCY || 5);
-const LEASE_TIMEOUT_MS = 5 * 60 * 1000; // 5-minute lease timeout for stale crash recovery
+const LEASE_TIMEOUT_MS = 5 * 60 * 1000;
 
-// 5xx and invalid credentials are permanent; 4xx and network errors are retryable
 function isPermanentSmtpError(error: any): boolean {
   if (!error) return false;
 
-  // 1. Check SMTP response code (e.g. error.responseCode or numeric prefix of error.response)
   const responseCode =
     error.responseCode ||
     (typeof error.response === "string" ? parseInt(error.response.slice(0, 3), 10) : undefined);
 
-  // Any explicit 4xx code is transient by RFC 5321 specification
   if (responseCode && responseCode >= 400 && responseCode < 500) {
     return false;
   }
 
-  // Network and socket-level errors are always transient
   const transientNetworkCodes = new Set([
     "ECONNRESET",
     "ECONNREFUSED",
@@ -43,22 +39,17 @@ function isPermanentSmtpError(error: any): boolean {
     return false;
   }
 
-  // Explicit 5xx SMTP error codes are permanent (e.g. 550, 553, 535)
   if (responseCode && responseCode >= 500 && responseCode < 600) {
     return true;
   }
 
-  // EAUTH is permanent only if accompanied by a 5xx code or when it's an explicit credential failure
   if (error.code === "EAUTH") {
-    // If responseCode is 4xx, it's temporary (e.g. 454)
     if (responseCode && responseCode >= 400 && responseCode < 500) {
       return false;
     }
-    // If responseCode is 535 or other 5xx, it's permanent
     if (responseCode && responseCode >= 500) {
       return true;
     }
-    // If no responseCode, check if error message indicates invalid credentials vs network/timeout
     const msg = (error.message || "").toLowerCase();
     if (
       msg.includes("timeout") ||
@@ -71,7 +62,6 @@ function isPermanentSmtpError(error: any): boolean {
     return true;
   }
 
-  // EENVELOPE with 5xx or invalid recipient address format
   if (error.code === "EENVELOPE") {
     if (responseCode && responseCode >= 400 && responseCode < 500) {
       return false;
@@ -79,7 +69,6 @@ function isPermanentSmtpError(error: any): boolean {
     return true;
   }
 
-  // Default: treat unknown errors as temporary/retryable so BullMQ retries before giving up
   return false;
 }
 
@@ -88,7 +77,6 @@ export const emailWorker = new Worker(
   async (job, token) => {
     const emailId = job.data.emailId;
 
-    // Atomic lease claim with expiry
     const claimToken = crypto.randomUUID();
     const now = new Date();
     const leaseExpiresAt = new Date(now.getTime() + LEASE_TIMEOUT_MS);
@@ -123,7 +111,6 @@ export const emailWorker = new Worker(
         },
       });
 
-      // Discard orphaned BullMQ job if record was deleted from DB
       if (!current) {
         console.warn(
           `[Claim Guard] Job ${emailId} not in DB. Discarding queue job.`
@@ -140,7 +127,6 @@ export const emailWorker = new Worker(
       }
 
       if (current.status === "PROCESSING") {
-        // Leased by another worker; re-check after lease expires
         const remainingLeaseMs = Math.max(
           5000,
           (current.leaseExpiresAt?.getTime() ||
@@ -153,12 +139,10 @@ export const emailWorker = new Worker(
         throw new DelayedError();
       }
 
-      // Claim missed; retry shortly
       await job.moveToDelayed(Date.now() + 5000, token);
       throw new DelayedError();
     }
 
-    // 2. Fetch full email job with sender and campaign
     const email = await prisma.emailJob.findUnique({
       where: { id: emailId },
       include: {
@@ -195,7 +179,6 @@ export const emailWorker = new Worker(
       throw new UnrecoverableError(configError);
     }
 
-    // 3. Distributed Redis Rate Limiter Check (Dual-Tier: Sender Global + Campaign Specific)
     const reservation = await reserveSendingSlot({
       senderId: sender.id,
       campaignId: email.campaignId,
@@ -210,7 +193,6 @@ export const emailWorker = new Worker(
         `[Rate Limiter] Sender ${sender.email} rate-limited (${reservation.reason}). Delaying job ${job.id} for ${reservation.retryAfterMs}ms (until ${new Date(nextEligibleTime).toISOString()}).`
       );
 
-      // Delay job until next eligible time
       await prisma.emailJob.updateMany({
         where: { id: email.id, claimToken },
         data: {
@@ -224,12 +206,10 @@ export const emailWorker = new Worker(
       });
       indexEmailJob(email.id).catch(() => {});
 
-      // Move job back to BullMQ delayed state without consuming retry attempts
       await job.moveToDelayed(nextEligibleTime, token);
       throw new DelayedError();
     }
 
-    // Record SMTP attempt start before sending
     const preStamp = await prisma.emailJob.updateMany({
       where: { id: email.id, claimToken },
       data: {
@@ -245,7 +225,6 @@ export const emailWorker = new Worker(
       return { message: "Lease lost before SMTP dispatch" };
     }
 
-    // Send via SMTP
     try {
       const transporter = nodemailer.createTransport({
         host: sender.smtpHost,
@@ -264,7 +243,6 @@ export const emailWorker = new Worker(
         text: email.body,
       });
 
-      // Mark as SENT with fencing token
       const updateResult = await prisma.emailJob.updateMany({
         where: { id: email.id, claimToken },
         data: {
@@ -346,7 +324,6 @@ export const emailWorker = new Worker(
         throw error;
       }
 
-      // Temporary failure: reset status for BullMQ retry
       console.warn(
         `[Worker] Temporary failure on attempt ${currentAttempt}/${maxAttempts} for ${email.recipientEmail}: ${error.message}. Retrying via BullMQ backoff...`
       );
@@ -379,14 +356,12 @@ emailWorker.on("completed", (job) => {
 });
 
 emailWorker.on("failed", (job, error) => {
-  // Do not log DelayedError as a failure since it represents a clean reschedule
   if (error instanceof DelayedError || error.name === "DelayedError") {
     return;
   }
   console.error(`Job ${job?.id} failed:`, error.message);
 });
 
-// Debounced queue drained listener using atomic Redis lock (30s TTL)
 emailWorker.on("drained", async () => {
   try {
     const acquired = await redis.set("reconciler:drain:lock", "1", "EX", 30, "NX");
@@ -402,7 +377,6 @@ emailWorker.on("drained", async () => {
 
 console.log(`Email worker started with concurrency ${concurrency}`);
 
-// Non-cron startup reconciliation
 reconcileDatabaseToQueue()
   .then((report) => {
     console.log(
@@ -412,5 +386,3 @@ reconcileDatabaseToQueue()
   .catch((err) => {
     console.error("[Worker Boot] Error during startup reconciliation:", err);
   });
-
-

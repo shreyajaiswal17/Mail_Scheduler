@@ -20,7 +20,6 @@ createBullBoard({
 
 const router = Router();
 
-// Protect dashboard, static assets, internal APIs, and administrative actions
 router.use(requireAuth);
 router.use(requireAdmin);
 router.use("/", serverAdapter.getRouter());

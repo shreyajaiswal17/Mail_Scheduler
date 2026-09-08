@@ -24,13 +24,11 @@ export const requireAuth = async (
   try {
     let token: string | undefined;
 
-    // 1. Check Authorization header
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
       token = authHeader.split(" ")[1];
     }
 
-    // 2. Fallback to cookie
     if (!token && req.cookies && req.cookies.token) {
       token = req.cookies.token;
     }
@@ -43,7 +41,6 @@ export const requireAuth = async (
       return;
     }
 
-    // Verify token
     const decoded = jwt.verify(token, JWT_SECRET) as {
       userId: string;
       email: string;
@@ -57,7 +54,6 @@ export const requireAuth = async (
       return;
     }
 
-    // Lookup user in database
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: {
@@ -88,10 +84,6 @@ export const requireAuth = async (
   }
 };
 
-/**
- * Authorization middleware for admin-only endpoints.
- * Compares authenticated user's email against comma-separated ADMIN_EMAILS env variable.
- */
 export const requireAdmin = (
   req: AuthenticatedRequest,
   res: Response,

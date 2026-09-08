@@ -29,7 +29,6 @@ export interface ElasticEmailDoc {
   updatedAt: string;
 }
 
-// Sanitizer strictly picks only search/filter metadata; never includes credentials or secrets
 export function toElasticEmailDoc(email: any, userId?: string): ElasticEmailDoc {
   return {
     id: email.id,
@@ -48,7 +47,6 @@ export function toElasticEmailDoc(email: any, userId?: string): ElasticEmailDoc 
   };
 }
 
-// Ensure index exists with text search and exact keyword filters
 export async function initEmailIndex(): Promise<void> {
   try {
     const exists = await esClient.indices.exists({ index: ELASTICSEARCH_INDEX });
@@ -83,14 +81,12 @@ export async function initEmailIndex(): Promise<void> {
           },
         },
       });
-      console.log(`[Elasticsearch] Initialized index ${ELASTICSEARCH_INDEX} with schema mappings`);
     }
   } catch (error: any) {
     console.warn(`[Elasticsearch] Could not initialize index ${ELASTICSEARCH_INDEX}:`, error.message);
   }
 }
 
-// Mark search outbox entry as PENDING in PostgreSQL (durable intent)
 export async function markSearchOutboxPending(emailId: string): Promise<void> {
   try {
     await prisma.searchOutbox.upsert({
@@ -103,7 +99,6 @@ export async function markSearchOutboxPending(emailId: string): Promise<void> {
   }
 }
 
-// Mark search outbox entries as DISPATCHED in PostgreSQL
 export async function markSearchOutboxDispatched(emailIds: string[]): Promise<void> {
   if (!emailIds || emailIds.length === 0) return;
   try {
@@ -116,9 +111,7 @@ export async function markSearchOutboxDispatched(emailIds: string[]): Promise<vo
   }
 }
 
-// Index single EmailJob record with external versioning and durable intent
 export async function indexEmailJob(emailId: string): Promise<boolean> {
-  // 1. Record durable intent in PostgreSQL first
   await markSearchOutboxPending(emailId);
 
   try {
@@ -134,7 +127,6 @@ export async function indexEmailJob(emailId: string): Promise<boolean> {
     const doc = toElasticEmailDoc(email);
     const version = new Date(email.updatedAt).getTime();
 
-    // Use external_gte versioning to prevent older indexing updates from overwriting newer DB state
     try {
       await esClient.index({
         index: ELASTICSEARCH_INDEX,
@@ -145,13 +137,11 @@ export async function indexEmailJob(emailId: string): Promise<boolean> {
       });
     } catch (indexError: any) {
       const statusCode = indexError.statusCode || indexError.meta?.statusCode;
-      // HTTP 409 means Elasticsearch already has a newer or equal state; treat as satisfied
       if (statusCode !== 409) {
         throw indexError;
       }
     }
 
-    // Mark as dispatched in PostgreSQL outbox and drain from Redis dirty queue
     await markSearchOutboxDispatched([email.id]);
     await redis.srem(REDIS_DIRTY_KEY, emailId).catch(() => {});
     return true;
@@ -162,7 +152,6 @@ export async function indexEmailJob(emailId: string): Promise<boolean> {
   }
 }
 
-// Bulk index a batch of EmailJobs with external_gte versioning and durable intent
 export async function indexEmailJobsBatch(emailIds: string[]): Promise<number> {
   if (!emailIds || emailIds.length === 0) return 0;
 
@@ -195,7 +184,6 @@ export async function indexEmailJobsBatch(emailIds: string[]): Promise<number> {
       if (!action) return;
 
       const emailId = action._id || emails[index]?.id;
-      // Success (200/201) or 409 version conflict (already at or ahead of this version)
       if (action.status < 400 || action.status === 409) {
         if (emailId) successfullyIndexedIds.push(emailId);
       } else {
@@ -220,7 +208,6 @@ export async function indexEmailJobsBatch(emailIds: string[]): Promise<number> {
   }
 }
 
-// Reconcile durable SearchOutbox records and Redis dirty queue without cron
 export async function reconcileElasticsearch(): Promise<{ syncedOutbox: number; syncedRedis: number; backfilled: number }> {
   let syncedOutbox = 0;
   let syncedRedis = 0;
@@ -229,13 +216,11 @@ export async function reconcileElasticsearch(): Promise<{ syncedOutbox: number; 
   try {
     const isAlive = await esClient.ping().catch(() => false);
     if (!isAlive) {
-      console.warn("[Elasticsearch] Ping failed during reconciliation. Skipping until reachable.");
       return { syncedOutbox, syncedRedis, backfilled };
     }
 
     await initEmailIndex();
 
-    // 1. Drain durable PostgreSQL SearchOutbox records (handles ES or Redis restarts)
     const pendingOutbox = await prisma.searchOutbox.findMany({
       where: { status: "PENDING" },
       take: 200,
@@ -246,16 +231,11 @@ export async function reconcileElasticsearch(): Promise<{ syncedOutbox: number; 
     if (pendingOutbox.length > 0) {
       const ids = pendingOutbox.map((o) => o.emailId);
       syncedOutbox = await indexEmailJobsBatch(ids);
-      console.log(`[SearchOutbox Reconciler] Synced ${syncedOutbox}/${ids.length} pending durable outbox records.`);
     }
 
-    // 2. Drain in-memory Redis dirty keys if any
     const dirtyIds = await redis.smembers(REDIS_DIRTY_KEY).catch(() => [] as string[]);
     if (dirtyIds.length > 0) {
       syncedRedis = await indexEmailJobsBatch(dirtyIds);
-      if (syncedRedis > 0) {
-        console.log(`[Elasticsearch Reconciler] Synced ${syncedRedis}/${dirtyIds.length} pending Redis dirty records.`);
-      }
     }
   } catch (error: any) {
     console.error("[Elasticsearch Reconciler] Error during reconciliation:", error.message);
@@ -264,7 +244,6 @@ export async function reconcileElasticsearch(): Promise<{ syncedOutbox: number; 
   return { syncedOutbox, syncedRedis, backfilled };
 }
 
-// Bounded cursor-based backfill for existing records without relying on count equality
 export async function backfillEmailsCursor(
   cursor?: string,
   limit = 200
@@ -285,7 +264,6 @@ export async function backfillEmailsCursor(
   return { nextCursor, count: batch.length };
 }
 
-// Full bounded cursor-based sweep across all EmailJobs
 export async function backfillAllEmails(batchSize = 200): Promise<number> {
   let totalIndexed = 0;
   let cursor: string | undefined = undefined;
@@ -301,7 +279,6 @@ export async function backfillAllEmails(batchSize = 200): Promise<number> {
     }
 
     await esClient.indices.refresh({ index: ELASTICSEARCH_INDEX });
-    console.log(`[Elasticsearch Backfill] Cursor sweep completed: ${totalIndexed} emails synchronized with external_gte.`);
   } catch (error: any) {
     console.error("[Elasticsearch Backfill] Failed during backfill:", error.message);
   }

@@ -16,7 +16,6 @@ async function verifyOfflineRecovery() {
   const initialEsCount = (await esClient.count({ index: ELASTICSEARCH_INDEX })).count;
   console.log(`DB Count: ${initialDbCount} | ES Count: ${initialEsCount}`);
 
-  // Create a brand new test campaign & email to have a clean, controlled lifecycle
   const sender = await prisma.sender.findFirst({ where: { isActive: true } });
   if (!sender) throw new Error("No active sender found in database");
 
@@ -45,7 +44,6 @@ async function verifyOfflineRecovery() {
     include: { campaign: true },
   });
 
-  // Index initial SCHEDULED state into Elasticsearch
   await indexEmailJob(testEmail.id);
   await esClient.indices.refresh({ index: ELASTICSEARCH_INDEX });
 
@@ -53,7 +51,6 @@ async function verifyOfflineRecovery() {
   const initialSource = initialDoc._source as any;
   console.log(`[ES Document] Initial state in Elasticsearch: status = ${initialSource?.status}`);
 
-  // Verify counts are equal
   const countBeforeOutageDb = await prisma.emailJob.count();
   const countBeforeOutageEs = (await esClient.count({ index: ELASTICSEARCH_INDEX })).count;
   console.log(`Document Counts Before Outage: DB = ${countBeforeOutageDb}, ES = ${countBeforeOutageEs} (Equal: ${countBeforeOutageDb === countBeforeOutageEs})`);
@@ -73,12 +70,10 @@ async function verifyOfflineRecovery() {
     },
   });
 
-  // Call indexEmailJob while Elasticsearch is offline
   console.log("Calling indexEmailJob while ES is completely offline...");
   const callResult = await indexEmailJob(updatedEmail.id);
   console.log(`indexEmailJob returned cleanly without throwing (success = ${callResult})`);
 
-  // Verify durable PostgreSQL SearchOutbox
   const outboxEntry = await prisma.searchOutbox.findUnique({
     where: { emailId: updatedEmail.id },
   });
@@ -115,13 +110,11 @@ async function verifyOfflineRecovery() {
   const recon = await reconcileElasticsearch();
   console.log(`Reconciliation result: Synced Outbox = ${recon.syncedOutbox}, Synced Redis = ${recon.syncedRedis}`);
 
-  // Verify PostgreSQL SearchOutbox is now DISPATCHED
   const outboxAfter = await prisma.searchOutbox.findUnique({
     where: { emailId: updatedEmail.id },
   });
   console.log(`[PostgreSQL SearchOutbox] Final status: ${outboxAfter?.status}`);
 
-  // Verify Elasticsearch document now has the updated status SENT
   await esClient.indices.refresh({ index: ELASTICSEARCH_INDEX });
   const finalDoc = await esClient.get({ index: ELASTICSEARCH_INDEX, id: testEmail.id });
   const finalSource = finalDoc._source as any;
