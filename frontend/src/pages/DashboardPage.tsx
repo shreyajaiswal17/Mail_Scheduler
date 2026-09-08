@@ -8,7 +8,6 @@ import {
   Send,
   Users,
   Shield,
-  Layers,
   ArrowRight,
   RefreshCw,
   Sparkles,
@@ -20,6 +19,7 @@ import {
   Server,
   KeyRound,
 } from "lucide-react";
+import { ComposeEmailModal } from "../components/ComposeEmailModal";
 
 interface Sender {
   id: string;
@@ -43,6 +43,7 @@ export const DashboardPage: React.FC = () => {
 
   // Modal & form state (transient only — never stored in persistent storage)
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
@@ -234,6 +235,16 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
+          <button
+            id="nav-compose-btn"
+            onClick={() => setIsComposeOpen(true)}
+            className="nav-compose-btn"
+            title="Compose New Email"
+          >
+            <Send size={14} />
+            <span>Compose</span>
+          </button>
+
           <button id="logout-btn" onClick={logout} className="logout-btn" title="Sign out">
             <LogOut size={16} />
             <span>Sign Out</span>
@@ -375,9 +386,13 @@ export const DashboardPage: React.FC = () => {
                 <Plus size={16} />
                 <span>Add Sender</span>
               </button>
-              <button className="primary-action-btn">
-                <Layers size={16} />
-                <span>Create Campaign</span>
+              <button
+                id="compose-email-btn"
+                className="primary-action-btn"
+                onClick={() => setIsComposeOpen(true)}
+              >
+                <Send size={16} />
+                <span>Compose New Email</span>
               </button>
             </div>
           </div>
@@ -665,6 +680,14 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Compose & Schedule Email Modal */}
+      <ComposeEmailModal
+        isOpen={isComposeOpen}
+        onClose={() => setIsComposeOpen(false)}
+        senders={senders}
+        onScheduledSuccess={fetchSenders}
+      />
     </div>
   );
 };
