@@ -54,11 +54,9 @@ interface EmailItem {
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
 
-  // Navigation tabs: 'sent' | 'scheduled' | 'senders' | 'slack'
   const [activeTab, setActiveTab] = useState<"sent" | "scheduled" | "senders" | "slack">("scheduled");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // Real data state
   const [senders, setSenders] = useState<Sender[]>([]);
   const [isLoadingSenders, setIsLoadingSenders] = useState(true);
   const [dbStatus, setDbStatus] = useState<string>("checking...");
@@ -68,12 +66,10 @@ export const DashboardPage: React.FC = () => {
   const [scheduledCount, setScheduledCount] = useState<number>(0);
   const [sentCount, setSentCount] = useState<number>(0);
 
-  // Modals & Popovers
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
 
-  // Senders Modal Form State
   const [isSenderModalOpen, setIsSenderModalOpen] = useState(false);
   const [isSubmittingSender, setIsSubmittingSender] = useState(false);
   const [senderSubmitError, setSenderSubmitError] = useState<string | null>(null);
@@ -87,7 +83,6 @@ export const DashboardPage: React.FC = () => {
     smtpPassword: "",
   });
 
-  // Slack Connection State
   const [slackStatus, setSlackStatus] = useState<{
     connected: boolean;
     teamName?: string | null;
@@ -218,7 +213,6 @@ export const DashboardPage: React.FC = () => {
     }
   }, [activeTab, fetchEmails, fetchEmailCounts]);
 
-  // Periodic polling for realtime email and count updates (100% silent in background)
   useEffect(() => {
     const interval = setInterval(() => {
       fetchEmailCounts();
@@ -229,7 +223,6 @@ export const DashboardPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [activeTab, fetchEmails, fetchEmailCounts]);
 
-  // Compute displayed list: ONLY real API emails (no fake demo emails)
   const displayedEmails = useMemo(() => {
     if (!searchQuery.trim()) return realEmails;
 
@@ -299,16 +292,13 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-white text-gray-900 font-sans antialiased overflow-x-hidden">
-      {/* 1. Left Sidebar (Figma Screenshot 5) */}
       <aside className="w-60 flex-shrink-0 bg-white border-r border-gray-100 p-5 flex flex-col min-h-screen">
-        {/* Top Logo */}
         <div className="mb-6 pl-1">
           <span className="text-3xl font-black tracking-tighter text-black leading-none select-none">
             ONG
           </span>
         </div>
 
-        {/* User Profile Pill Card */}
         <div className="relative mb-4">
           <button
             type="button"
@@ -342,7 +332,6 @@ export const DashboardPage: React.FC = () => {
             <ChevronDown size={14} className="text-gray-400 flex-shrink-0 ml-auto" />
           </button>
 
-          {/* User Menu Dropdown */}
           {isUserMenuOpen && (
             <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-50 animate-fade-in">
               <div className="flex flex-col gap-0.5 text-xs pb-2 border-b border-gray-100">
@@ -373,7 +362,6 @@ export const DashboardPage: React.FC = () => {
           )}
         </div>
 
-        {/* Compose Button (Figma Screenshot 5) */}
         <div className="mb-7">
           <button
             type="button"
@@ -385,14 +373,12 @@ export const DashboardPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Navigation Section: CORE */}
         <div className="flex flex-col">
           <span className="text-[11px] font-bold text-gray-400 tracking-wider uppercase mb-2 pl-1.5">
             CORE
           </span>
 
           <nav className="flex flex-col gap-1">
-            {/* Scheduled */}
             <button
               type="button"
               id="nav-tab-scheduled"
@@ -419,7 +405,6 @@ export const DashboardPage: React.FC = () => {
               </span>
             </button>
 
-            {/* Sent */}
             <button
               type="button"
               id="nav-tab-sent"
@@ -448,14 +433,12 @@ export const DashboardPage: React.FC = () => {
           </nav>
         </div>
 
-        {/* Navigation Section: MANAGEMENT */}
         <div className="flex flex-col mt-6">
           <span className="text-[11px] font-bold text-gray-400 tracking-wider uppercase mb-2 pl-1.5">
             MANAGEMENT
           </span>
 
           <nav className="flex flex-col gap-1">
-            {/* Senders */}
             <button
               type="button"
               id="nav-tab-senders"
@@ -482,7 +465,6 @@ export const DashboardPage: React.FC = () => {
               </span>
             </button>
 
-            {/* Slack Alerts */}
             <button
               type="button"
               id="nav-tab-slack"
@@ -510,12 +492,9 @@ export const DashboardPage: React.FC = () => {
         </div>
       </aside>
 
-      {/* 2. Main Content Area */}
       <main className="flex-1 min-w-0 bg-white flex flex-col px-8 py-6 overflow-y-auto">
-        {/* If an email is selected, display Email Detail View (Screenshot 4) */}
         {selectedEmail ? (
           <div className="w-full max-w-3xl animate-fade-in">
-            {/* Detail View Header */}
             <div className="flex items-center justify-between pb-3.5 mb-5 border-b border-gray-100">
               <div className="flex items-center gap-2.5">
                 <button
@@ -560,7 +539,6 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Sender and Recipient Row */}
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-full bg-emerald-500 text-white font-bold text-base flex items-center justify-center flex-shrink-0">
                 A
@@ -582,7 +560,6 @@ export const DashboardPage: React.FC = () => {
               <span className="text-xs text-gray-400">{selectedEmail.date || "Nov 3, 10:23 AM"}</span>
             </div>
 
-            {/* Email Body Content */}
             <div className="text-sm leading-relaxed text-gray-800">
               <p className="mb-4">Hey Oliver,</p>
               <p className="mb-4">You've just RECEIVED something</p>
@@ -609,7 +586,6 @@ export const DashboardPage: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* Top Search & Action Bar (Figma Screenshot 5) */}
             <div className="flex items-center gap-3.5 mb-6">
               <div className="relative flex-1 max-w-2xl">
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -647,7 +623,6 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Tab: Scheduled or Sent Emails List (Figma Screenshot 5) */}
             {(activeTab === "scheduled" || activeTab === "sent") && (
               <div className="w-full">
                 {isLoadingEmails && realEmails.length === 0 ? (
@@ -682,12 +657,10 @@ export const DashboardPage: React.FC = () => {
                         className="flex items-center px-4 py-3 border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer gap-4 rounded-lg"
                         onClick={() => setSelectedEmail(email)}
                       >
-                        {/* Recipient */}
                         <div className="w-44 flex-shrink-0 font-semibold text-sm text-gray-900 truncate">
                           <span>To: {email.recipientEmail}</span>
                         </div>
 
-                        {/* Status Badge */}
                         <div className="flex-shrink-0">
                           <span
                             className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
@@ -700,7 +673,6 @@ export const DashboardPage: React.FC = () => {
                           </span>
                         </div>
 
-                        {/* Subject & Preview */}
                         <div className="flex-1 min-w-0 flex items-center gap-1.5 truncate text-[13.5px]">
                           <span className="font-semibold text-gray-900 flex-shrink-0">
                             {email.subject}
@@ -710,7 +682,6 @@ export const DashboardPage: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Right: Star */}
                         <div
                           className="flex items-center gap-3 flex-shrink-0"
                           onClick={(e) => {
@@ -734,7 +705,6 @@ export const DashboardPage: React.FC = () => {
               </div>
             )}
 
-            {/* Tab: Senders Management */}
             {activeTab === "senders" && (
               <div className="w-full max-w-4xl animate-fade-in">
                 <div className="flex items-center justify-between mb-6">
@@ -836,7 +806,6 @@ export const DashboardPage: React.FC = () => {
               </div>
             )}
 
-            {/* Tab: Slack Alerts Integration */}
             {activeTab === "slack" && (
               <div className="w-full max-w-4xl animate-fade-in">
                 <div className="mb-6">
@@ -863,7 +832,6 @@ export const DashboardPage: React.FC = () => {
         )}
       </main>
 
-      {/* Add / Configure Sender Modal */}
       {isSenderModalOpen && (
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in"
@@ -1007,7 +975,6 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Compose & Schedule Email Modal (Figma Screenshots 1-3) */}
       <ComposeEmailModal
         isOpen={isComposeOpen}
         onClose={() => setIsComposeOpen(false)}

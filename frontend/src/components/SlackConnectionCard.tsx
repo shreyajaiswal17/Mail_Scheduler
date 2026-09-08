@@ -75,7 +75,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Channels and Alerts State
   const [channels, setChannels] = useState<SlackChannelItem[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<string>("");
   const [customChannelInput, setCustomChannelInput] = useState<string>("");
@@ -313,7 +312,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-6">
-      {/* Success Banner */}
       {successMessage && (
         <div className="flex items-center justify-between p-3 rounded-lg text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 mb-4 animate-fade-in">
           <div className="flex items-center gap-2">
@@ -330,7 +328,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
         </div>
       )}
 
-      {/* Error Banner */}
       {errorMessage && (
         <div className="flex items-center justify-between p-3 rounded-lg text-xs bg-red-50 border border-red-200 text-red-800 mb-4 animate-fade-in">
           <div className="flex items-center gap-2">
@@ -395,7 +392,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
             <span>Checking Slack integration status...</span>
           </div>
         ) : isConnected ? (
-          /* Connected State */
           <div className="flex flex-col animate-fade-in">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
               <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
@@ -454,7 +450,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
               </span>
             </div>
 
-            {/* Notification Channel Configuration */}
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
@@ -625,7 +620,6 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
             </div>
           </div>
         ) : (
-          /* Disconnected State */
           <div className="flex flex-col animate-fade-in">
             <div className="flex flex-col gap-4">
               <div className="flex gap-2.5 flex-wrap">

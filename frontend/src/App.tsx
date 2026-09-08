@@ -27,12 +27,10 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // If path is /dashboard and user is authenticated -> render DashboardPage
   if (currentPath === "/dashboard" && user) {
     return <DashboardPage />;
   }
 
-  // Default: Open with the Login page (matching the design requested)
   return <LoginPage />;
 };
 

@@ -35,7 +35,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       setError(null);
 
-      // Check URL parameters for token or error from OAuth redirect
       const urlParams = new URLSearchParams(window.location.search);
       const tokenFromUrl = urlParams.get("token");
       const errorFromUrl = urlParams.get("error");
@@ -48,7 +47,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (tokenFromUrl) {
           localStorage.setItem("auth_token", tokenFromUrl);
         }
-        // Clean URL parameters cleanly so refresh doesn't keep old error/token
         const cleanUrl = window.location.pathname;
         window.history.replaceState({}, document.title, cleanUrl);
       }
@@ -86,7 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [checkAuth]);
 
   const loginWithGoogle = () => {
-    // Redirect browser to backend Google OAuth initiation endpoint
     window.location.href = `${API_BASE_URL}/api/auth/google`;
   };
 

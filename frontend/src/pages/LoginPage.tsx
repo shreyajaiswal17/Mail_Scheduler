@@ -40,14 +40,11 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full bg-white flex items-center justify-center p-4">
-      {/* Centered Login Box (Matches Attached Design) */}
       <div className="w-full max-w-[390px] bg-white border border-gray-100 rounded-2xl p-8 shadow-[0_2px_16px_rgba(0,0,0,0.03)] transition-all">
-        {/* Title */}
         <h1 className="text-[28px] font-bold text-gray-900 text-center tracking-tight mb-7">
           Login
         </h1>
 
-        {/* Error Alert */}
         {displayError && (
           <div className="mb-5 p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-xs flex items-start gap-2">
             <AlertCircle size={15} className="shrink-0 mt-0.5" />
@@ -55,14 +52,12 @@ export const LoginPage: React.FC = () => {
           </div>
         )}
 
-        {/* Login with Google Button */}
         <button
           type="button"
           id="google-login-btn"
           onClick={loginWithGoogle}
           className="w-full h-11 px-4 rounded-lg bg-[#EAF7ED] hover:bg-[#dcf2e1] active:bg-[#d2edd8] flex items-center justify-center gap-2.5 text-xs font-semibold text-gray-800 transition cursor-pointer"
         >
-          {/* Multi-color Google 'G' icon */}
           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
             <path
               fill="#4285F4"
@@ -84,7 +79,6 @@ export const LoginPage: React.FC = () => {
           <span>Login with Google</span>
         </button>
 
-        {/* Divider: "or sign up through email" */}
         <div className="relative my-6 flex items-center justify-center">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-100"></div>
@@ -94,7 +88,6 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Email & Password Form */}
         <form onSubmit={handleEmailLogin} className="flex flex-col gap-3">
           <div>
             <input
@@ -120,7 +113,6 @@ export const LoginPage: React.FC = () => {
             />
           </div>
 
-          {/* Login Submit Button */}
           <button
             type="submit"
             id="email-login-btn"
@@ -138,7 +130,6 @@ export const LoginPage: React.FC = () => {
           </button>
         </form>
 
-        {/* If user is already authenticated in session */}
         {user && (
           <div className="mt-5 pt-4 border-t border-gray-100 text-center">
             <span className="text-[11px] text-gray-400 block mb-1">

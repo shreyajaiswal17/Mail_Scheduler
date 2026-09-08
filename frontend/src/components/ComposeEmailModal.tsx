@@ -51,7 +51,7 @@ export const extractEmails = (text: string): string[] => {
 };
 
 const getDefaultStartTime = (): string => {
-  const date = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes from now
+  const date = new Date(Date.now() + 2 * 60 * 1000);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -88,7 +88,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Default to first active sender if available
   useEffect(() => {
     if (activeSenders.length > 0 && !senderId) {
       setSenderId(activeSenders[0].id);
@@ -253,7 +252,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
         role="dialog"
         aria-modal="true"
       >
-        {/* Top Header (Figma Screenshots 1-3) */}
         <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <button
@@ -337,7 +335,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
               </button>
             </div>
 
-            {/* Send Later Popover (Figma Screenshot 3) */}
             {showSendLaterPopover && (
               <div className="absolute top-full right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-4 z-50 animate-fade-in">
                 <div className="flex items-center justify-between mb-3">
@@ -413,7 +410,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
           </div>
         </div>
 
-        {/* Banners */}
         {submitError && (
           <div className="flex items-center gap-2 p-2.5 mb-3 rounded-lg text-xs bg-red-50 border border-red-200 text-red-700 animate-fade-in">
             <AlertCircle size={15} />
@@ -427,9 +423,7 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
           </div>
         )}
 
-        {/* Compose Form */}
         <div className="flex flex-col">
-          {/* From Line */}
           <div className="flex items-center gap-4 py-2.5 border-b border-gray-100">
             <label className="w-14 text-xs font-semibold text-gray-400">From</label>
             <div className="inline-flex items-center bg-gray-50 border border-gray-200 rounded-full px-3 py-1 relative">
@@ -453,7 +447,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
             </div>
           </div>
 
-          {/* To Line */}
           <div className="flex items-start gap-4 py-2.5 border-b border-gray-100">
             <label className="w-14 text-xs font-semibold text-gray-400 pt-1">To</label>
             <div className="flex-1 flex items-center justify-between gap-3 flex-wrap">
@@ -509,7 +502,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
             </div>
           </div>
 
-          {/* Subject Line */}
           <div className="flex items-center gap-4 py-2.5 border-b border-gray-100">
             <label className="w-14 text-xs font-semibold text-gray-400">Subject</label>
             <input
@@ -521,7 +513,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
             />
           </div>
 
-          {/* Controls: Delay & Hourly Limit */}
           <div className="flex items-center gap-8 py-2.5 border-b border-gray-100 text-xs text-gray-600">
             <div className="flex items-center gap-2">
               <span>Delay between 2 emails</span>
@@ -548,7 +539,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
             </div>
           </div>
 
-          {/* Email Body & Rich Toolbar (Screenshots 1 & 2) */}
           <div className="bg-gray-50/80 border border-gray-200/80 rounded-xl p-4 mt-3.5 flex flex-col">
             <textarea
               className="w-full bg-transparent border-none outline-none text-sm text-gray-900 placeholder:text-gray-400 resize-none min-h-[170px] font-sans leading-relaxed"
@@ -558,7 +548,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
               rows={8}
             />
 
-            {/* Bottom Toolbar */}
             <div className="bg-white border border-gray-200 rounded-full px-3.5 py-1.5 flex items-center gap-2 w-fit mt-3 shadow-xs">
               <div className="flex items-center gap-1">
                 <button type="button" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Undo">
@@ -608,7 +597,6 @@ export const ComposeEmailModal: React.FC<ComposeEmailModalProps> = ({
             </div>
           </div>
 
-          {/* Attached Files Preview */}
           {attachedFiles.length > 0 && (
             <div className="flex gap-3 mt-4 flex-wrap">
               {attachedFiles.map((file, idx) => (
