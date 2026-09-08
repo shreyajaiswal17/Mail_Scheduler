@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   Clock,
@@ -157,18 +157,23 @@ export const DashboardPage: React.FC = () => {
     }
   }, []);
 
-  const fetchEmails = useCallback(async () => {
+  const hasLoadedInitialEmails = useRef<Record<string, boolean>>({});
+
+  const fetchEmails = useCallback(async (isSilent = false) => {
+    const isInitial = !hasLoadedInitialEmails.current[activeTab];
     try {
-      setIsLoadingEmails(true);
+      if (!isSilent && isInitial) {
+        setIsLoadingEmails(true);
+      }
       const statusParam = activeTab === "scheduled" ? "SCHEDULED" : "SENT";
-      const qParam = searchQuery.trim() ? `&q=${encodeURIComponent(searchQuery.trim())}` : "";
-      const res = await fetch(`http://localhost:5000/api/emails?status=${statusParam}${qParam}`, {
+      const res = await fetch(`http://localhost:5000/api/emails?status=${statusParam}`, {
         headers: getAuthHeaders(),
         credentials: "include",
       });
 
       if (res.ok) {
         const data = await res.json();
+        hasLoadedInitialEmails.current[activeTab] = true;
         if (data.emails && data.emails.length > 0) {
           const mapped: EmailItem[] = data.emails.map((e: any) => ({
             id: e.id,
@@ -198,7 +203,7 @@ export const DashboardPage: React.FC = () => {
     } finally {
       setIsLoadingEmails(false);
     }
-  }, [activeTab, searchQuery]);
+  }, [activeTab]);
 
   useEffect(() => {
     checkDb();
@@ -208,19 +213,19 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === "scheduled" || activeTab === "sent") {
-      fetchEmails();
+      fetchEmails(false);
       fetchEmailCounts();
     }
   }, [activeTab, fetchEmails, fetchEmailCounts]);
 
-  // Periodic polling for realtime email and count updates
+  // Periodic polling for realtime email and count updates (100% silent in background)
   useEffect(() => {
     const interval = setInterval(() => {
       fetchEmailCounts();
       if (activeTab === "scheduled" || activeTab === "sent") {
-        fetchEmails();
+        fetchEmails(true);
       }
-    }, 5000);
+    }, 6000);
     return () => clearInterval(interval);
   }, [activeTab, fetchEmails, fetchEmailCounts]);
 
@@ -644,8 +649,8 @@ export const DashboardPage: React.FC = () => {
 
             {/* Tab: Scheduled or Sent Emails List (Figma Screenshot 5) */}
             {(activeTab === "scheduled" || activeTab === "sent") && (
-              <div className="w-full animate-fade-in">
-                {isLoadingEmails ? (
+              <div className="w-full">
+                {isLoadingEmails && realEmails.length === 0 ? (
                   <div className="flex items-center justify-center gap-3 py-16 text-gray-400 text-sm">
                     <Loader2 size={22} className="animate-spin text-emerald-500" />
                     <span>Loading emails...</span>
