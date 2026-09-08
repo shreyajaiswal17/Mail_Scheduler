@@ -132,6 +132,17 @@ export interface HourlyLimitAlertData {
   nextEligibleTime: number;
 }
 
+export interface CampaignHourlyLimitAlertData {
+  userId: string;
+  campaignId: string;
+  campaignName?: string | null;
+  senderId: string;
+  senderEmail: string;
+  senderName?: string | null;
+  hourlyLimit: number;
+  nextEligibleTime: number;
+}
+
 export async function getSlackConnectionStatus(userId: string): Promise<any> {
   const connection = await prisma.slackConnection.findUnique({
     where: { userId },
@@ -347,9 +358,29 @@ export async function deliverSlackNotification(outboxId: string): Promise<boolea
 
   try {
     const payload = record.payload as any;
+
+    // Dynamically query latest user connection so channel updates and disconnects take effect immediately
+    const connection = await prisma.slackConnection.findUnique({
+      where: { userId: record.userId },
+    });
+
+    if (!connection) {
+      await prisma.slackNotificationOutbox.update({
+        where: { id: outboxId },
+        data: {
+          status: "FAILED",
+          lastError: "Slack workspace was disconnected",
+          updatedAt: new Date(),
+        },
+      });
+      return false;
+    }
+
+    const targetChannelId = connection.channelId || record.channelId;
+
     const result = await postSlackMessage(
       record.userId,
-      record.channelId,
+      targetChannelId,
       payload.text || "Mail Scheduler Notification",
       payload.blocks
     );
@@ -359,6 +390,7 @@ export async function deliverSlackNotification(outboxId: string): Promise<boolea
         where: { id: outboxId },
         data: {
           status: "DISPATCHED",
+          channelId: targetChannelId,
           attempts: record.attempts + 1,
           updatedAt: new Date(),
         },
@@ -474,9 +506,9 @@ export async function notifySenderHourlyLimit(
   try {
     const ONE_HOUR_MS = 60 * 60 * 1000;
     const windowStartMs = Math.floor(Date.now() / ONE_HOUR_MS) * ONE_HOUR_MS;
-    const dedupKey = `slack:dedup:${data.userId}:${data.senderId}:${windowStartMs}`;
+    const dedupKey = `slack:dedup:${data.userId}:sender:${data.senderId}:${windowStartMs}`;
 
-    // 1. Hourly Window Deduplication
+    // 1. Hourly Window Deduplication for Sender Global Limit
     const acquired = await redis.set(dedupKey, "1", "EX", 7200, "NX");
     if (!acquired) {
       return { dispatched: false, reason: "DEDUPLICATED" };
@@ -496,13 +528,13 @@ export async function notifySenderHourlyLimit(
       : data.senderEmail;
     const nextTimeStr = new Date(data.nextEligibleTime).toUTCString();
 
-    const text = `⚠️ Hourly sending limit reached for sender ${senderDisplay}. Limit: ${data.hourlyLimit}/hr. Next eligible dispatch: ${nextTimeStr}.`;
+    const text = `⚠️ Global hourly sending limit reached for sender ${senderDisplay}. Limit: ${data.hourlyLimit}/hr. Next eligible dispatch: ${nextTimeStr}.`;
     const blocks = [
       {
         type: "header",
         text: {
           type: "plain_text",
-          text: "⚠️ Sender Hourly Sending Limit Reached",
+          text: "⚠️ Sender Global Hourly Limit Reached",
           emoji: true,
         },
       },
@@ -515,7 +547,7 @@ export async function notifySenderHourlyLimit(
           },
           {
             type: "mrkdwn",
-            text: `*Hourly Limit:*\n${data.hourlyLimit} emails / hr`,
+            text: `*Global Hourly Limit:*\n${data.hourlyLimit} emails / hr`,
           },
         ],
       },
@@ -537,7 +569,7 @@ export async function notifySenderHourlyLimit(
         elements: [
           {
             type: "mrkdwn",
-            text: "Pending emails remain safely queued and will resume dispatch automatically once the window opens.",
+            text: "All campaigns using this sender are paused until the next hourly window opens. Pending emails remain safely queued.",
           },
         ],
       },
@@ -549,8 +581,9 @@ export async function notifySenderHourlyLimit(
         userId: data.userId,
         senderId: data.senderId,
         channelId: connection.channelId,
-        eventType: "HOURLY_LIMIT",
+        eventType: "SENDER_HOURLY_LIMIT",
         payload: {
+          limitType: "SENDER_HOURLY_LIMIT",
           senderEmail: data.senderEmail,
           senderName: data.senderName,
           hourlyLimit: data.hourlyLimit,
@@ -567,12 +600,132 @@ export async function notifySenderHourlyLimit(
 
     // 4. Asynchronous delivery attempt
     deliverSlackNotification(outbox.id).catch((err) => {
-      console.warn("[Slack] Outbox immediate delivery error:", err?.message || err);
+      console.warn("[Slack] Outbox immediate delivery error for sender alert:", err?.message || err);
     });
 
     return { dispatched: true };
   } catch (err: any) {
     console.error("[Slack Service] Unexpected error in notifySenderHourlyLimit:", err?.message || err);
+    return { dispatched: false, reason: err?.message || "ERROR" };
+  }
+}
+
+/**
+ * Emits an hourly sending limit alert to Slack when Redis rate limiter returns CAMPAIGN_HOURLY_LIMIT.
+ * Completely non-blocking and safe: deduplicates per user, campaign, and hour.
+ * Preserves the distinction between global sender limits and campaign-specific limits.
+ */
+export async function notifyCampaignHourlyLimit(
+  data: CampaignHourlyLimitAlertData
+): Promise<{ dispatched: boolean; reason?: string }> {
+  try {
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const windowStartMs = Math.floor(Date.now() / ONE_HOUR_MS) * ONE_HOUR_MS;
+    const dedupKey = `slack:dedup:${data.userId}:campaign:${data.campaignId}:${windowStartMs}`;
+
+    // 1. Hourly Window Deduplication per Campaign
+    const acquired = await redis.set(dedupKey, "1", "EX", 7200, "NX");
+    if (!acquired) {
+      return { dispatched: false, reason: "DEDUPLICATED" };
+    }
+
+    // 2. Dynamic Connection & Channel Check
+    const connection = await prisma.slackConnection.findUnique({
+      where: { userId: data.userId },
+    });
+
+    if (!connection || !connection.channelId) {
+      return { dispatched: false, reason: "SLACK_NOT_CONNECTED_OR_NO_CHANNEL" };
+    }
+
+    const campaignDisplay = data.campaignName
+      ? `${data.campaignName}`
+      : `Campaign (${data.campaignId.slice(0, 8)})`;
+    const senderDisplay = data.senderName
+      ? `${data.senderName} (${data.senderEmail})`
+      : data.senderEmail;
+    const nextTimeStr = new Date(data.nextEligibleTime).toUTCString();
+
+    const text = `⚠️ Hourly sending limit reached for campaign "${campaignDisplay}". Limit: ${data.hourlyLimit}/hr. Next eligible dispatch: ${nextTimeStr}.`;
+    const blocks = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "⚠️ Campaign Hourly Sending Limit Reached",
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*Campaign:*\n${campaignDisplay}`,
+          },
+          {
+            type: "mrkdwn",
+            text: `*Campaign Limit:*\n${data.hourlyLimit} emails / hr`,
+          },
+        ],
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*Assigned Sender:*\n${senderDisplay}`,
+          },
+          {
+            type: "mrkdwn",
+            text: `*Next Eligible Window:*\n${nextTimeStr}`,
+          },
+        ],
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: "Campaign dispatch paused until the next hourly window. Global sender quota and other campaigns remain unaffected.",
+          },
+        ],
+      },
+    ];
+
+    // 3. Durable Outbox Intent
+    const outbox = await prisma.slackNotificationOutbox.create({
+      data: {
+        userId: data.userId,
+        senderId: data.senderId,
+        channelId: connection.channelId,
+        eventType: "CAMPAIGN_HOURLY_LIMIT",
+        payload: {
+          limitType: "CAMPAIGN_HOURLY_LIMIT",
+          campaignId: data.campaignId,
+          campaignName: data.campaignName,
+          senderEmail: data.senderEmail,
+          senderName: data.senderName,
+          hourlyLimit: data.hourlyLimit,
+          nextEligibleTime: data.nextEligibleTime,
+          text,
+          blocks,
+        },
+        status: "PENDING",
+        attempts: 0,
+        maxAttempts: 3,
+        nextAttemptAt: new Date(),
+      },
+    });
+
+    // 4. Asynchronous delivery attempt
+    deliverSlackNotification(outbox.id).catch((err) => {
+      console.warn("[Slack] Outbox immediate delivery error for campaign alert:", err?.message || err);
+    });
+
+    return { dispatched: true };
+  } catch (err: any) {
+    console.error("[Slack Service] Unexpected error in notifyCampaignHourlyLimit:", err?.message || err);
     return { dispatched: false, reason: err?.message || "ERROR" };
   }
 }
