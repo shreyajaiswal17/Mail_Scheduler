@@ -52,3 +52,6 @@ export function decryptPassword(value: string): string {
 
   return decrypted.toString("utf8");
 }
+
+export const encryptToken = encryptPassword;
+export const decryptToken = decryptPassword;

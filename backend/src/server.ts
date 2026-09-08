@@ -8,6 +8,7 @@ import senderRoutes from "./routes/sender.routes";
 import scheduleRoutes from "./routes/schedule.routes";
 import adminQueuesRoutes from "./routes/admin-queues.routes";
 import emailSearchRoutes from "./routes/email-search.routes";
+import slackRoutes from "./routes/slack.routes";
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use("/api/senders", senderRoutes);
 app.use("/api/emails/schedule", scheduleRoutes);
 app.use("/api/emails/search", emailSearchRoutes);
 app.use("/api/emails", emailSearchRoutes);
+app.use("/api/slack", slackRoutes);
 app.use("/admin/queues", adminQueuesRoutes);
 
 app.get("/health", (req, res) => {
