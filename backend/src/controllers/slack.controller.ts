@@ -10,7 +10,7 @@ import {
   disconnectSlack,
 } from "../services/slack.service";
 
-const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
 
 export const initiateSlackOAuth = async (
   req: AuthenticatedRequest,
@@ -50,7 +50,7 @@ export const handleSlackCallback = async (
     console.warn(`[Slack Callback] OAuth error returned from Slack: ${errorMsg}`);
 
     if (isHtmlClient) {
-      res.redirect(`${frontendUrl}/settings?slack=error&message=${encodeURIComponent(errorMsg)}`);
+      res.redirect(`${frontendUrl}/?slack=error&message=${encodeURIComponent(errorMsg)}`);
       return;
     }
 
@@ -63,7 +63,7 @@ export const handleSlackCallback = async (
 
   if (!code || !state || typeof code !== "string" || typeof state !== "string") {
     if (isHtmlClient) {
-      res.redirect(`${frontendUrl}/settings?slack=error&message=Missing+code+or+state`);
+      res.redirect(`${frontendUrl}/?slack=error&message=Missing+code+or+state`);
       return;
     }
 
@@ -78,7 +78,7 @@ export const handleSlackCallback = async (
     const userId = await validateAndConsumeSlackState(state);
     if (!userId) {
       if (isHtmlClient) {
-        res.redirect(`${frontendUrl}/settings?slack=error&message=Invalid+or+expired+state`);
+        res.redirect(`${frontendUrl}/?slack=error&message=Invalid+or+expired+state`);
         return;
       }
 
@@ -94,7 +94,7 @@ export const handleSlackCallback = async (
 
     if (isHtmlClient) {
       const teamParam = encodeURIComponent(connection.teamName || connection.teamId || "workspace");
-      res.redirect(`${frontendUrl}/settings?slack=connected&team=${teamParam}`);
+      res.redirect(`${frontendUrl}/?slack=connected&team=${teamParam}`);
       return;
     }
 
@@ -109,7 +109,7 @@ export const handleSlackCallback = async (
     console.error("[Slack Callback] Failed to complete OAuth exchange:", err?.message || err);
 
     if (isHtmlClient) {
-      res.redirect(`${frontendUrl}/settings?slack=error&message=${encodeURIComponent(err.message || "Exchange failed")}`);
+      res.redirect(`${frontendUrl}/?slack=error&message=${encodeURIComponent(err.message || "Exchange failed")}`);
       return;
     }
 

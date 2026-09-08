@@ -1,7 +1,12 @@
+import dotenv from "dotenv";
+dotenv.config();
+
+import { assertJwtSecret } from "./config/jwt";
+assertJwtSecret();
+
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import dotenv from "dotenv";
 import { prisma } from "./lib/prisma";
 import authRoutes from "./routes/auth.routes";
 import senderRoutes from "./routes/sender.routes";
@@ -9,8 +14,6 @@ import scheduleRoutes from "./routes/schedule.routes";
 import adminQueuesRoutes from "./routes/admin-queues.routes";
 import emailSearchRoutes from "./routes/email-search.routes";
 import slackRoutes from "./routes/slack.routes";
-
-dotenv.config();
 
 const app = express();
 

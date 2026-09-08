@@ -1,5 +1,6 @@
 import "dotenv/config";
 import jwt from "jsonwebtoken";
+import { getJwtSecret } from "../config/jwt";
 import { prisma } from "../lib/prisma";
 import { redis } from "../lib/redis";
 import {
@@ -125,22 +126,22 @@ async function runSlackVerification() {
   console.log("SUCCESS: Status endpoint returns workspace details without exposing tokens.");
 
   console.log("\n=== 5. Test Live HTTP API Endpoints ===");
-  const JWT_SECRET = process.env.JWT_SECRET || "mail_scheduler_jwt_secret_change_in_production";
+  const JWT_SECRET = getJwtSecret();
   const userToken = jwt.sign(
     { userId, email: testUser.email },
     JWT_SECRET,
     { expiresIn: "1h" }
   );
 
-  const serverUrl = "http://127.0.0.1:5000";
+  const serverUrl = "http://localhost:5000";
 
   const connectRes = await fetch(`${serverUrl}/api/slack/connect`, {
     headers: { Authorization: `Bearer ${userToken}` },
   });
   const connectJson = await connectRes.json();
-  console.log(`GET /api/slack/connect status: ${connectRes.status}, URL: ${connectJson.url?.substring(0, 50)}...`);
+  console.log(`GET /api/slack/connect status: ${connectRes.status}, Response:`, connectJson);
   if (connectRes.status !== 200 || !connectJson.url || !connectJson.state) {
-    throw new Error("FAILED: /api/slack/connect failed to return authorization URL!");
+    throw new Error(`FAILED: /api/slack/connect failed! status: ${connectRes.status}, body: ${JSON.stringify(connectJson)}`);
   }
 
   const statusRes = await fetch(`${serverUrl}/api/slack/status`, {

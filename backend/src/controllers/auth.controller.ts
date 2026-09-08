@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { getOAuth2Client, getGoogleClientId } from "../config/google";
+import { getJwtSecret } from "../config/jwt";
 import { prisma } from "../lib/prisma";
 import { AuthenticatedRequest } from "../middlewares/auth.middleware";
 
-const JWT_SECRET = process.env.JWT_SECRET || "mail_scheduler_jwt_secret_change_in_production";
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 /**
@@ -126,7 +126,7 @@ export const handleGoogleCallback = async (req: Request, res: Response): Promise
         userId: user.id,
         email: user.email,
       },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: "7d" }
     );
 

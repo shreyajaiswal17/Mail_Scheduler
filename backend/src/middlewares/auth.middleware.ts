@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
+import { getJwtSecret } from "../config/jwt";
 
 export interface AuthenticatedUser {
   id: string;
@@ -13,8 +14,6 @@ export interface AuthenticatedUser {
 export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
 }
-
-const JWT_SECRET = process.env.JWT_SECRET || "mail_scheduler_jwt_secret_change_in_production";
 
 export const requireAuth = async (
   req: AuthenticatedRequest,
@@ -41,7 +40,7 @@ export const requireAuth = async (
       return;
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    const decoded = jwt.verify(token, getJwtSecret()) as {
       userId: string;
       email: string;
     };

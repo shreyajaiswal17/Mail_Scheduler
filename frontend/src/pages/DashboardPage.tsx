@@ -20,6 +20,7 @@ import {
   KeyRound,
 } from "lucide-react";
 import { ComposeEmailModal } from "../components/ComposeEmailModal";
+import { SlackConnectionCard } from "../components/SlackConnectionCard";
 
 interface Sender {
   id: string;
@@ -40,6 +41,13 @@ export const DashboardPage: React.FC = () => {
   // Senders state
   const [senders, setSenders] = useState<Sender[]>([]);
   const [isLoadingSenders, setIsLoadingSenders] = useState(true);
+
+  // Slack connection state
+  const [slackStatus, setSlackStatus] = useState<{
+    connected: boolean;
+    teamName?: string | null;
+    teamId?: string | null;
+  } | null>(null);
 
   // Modal & form state (transient only — never stored in persistent storage)
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -235,6 +243,24 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Slack Connection Status Pill in Navbar */}
+          <div
+            id="nav-slack-status"
+            className={`nav-slack-pill ${slackStatus?.connected ? "connected" : "disconnected"}`}
+            title={
+              slackStatus?.connected
+                ? `Connected to Slack: ${slackStatus.teamName || slackStatus.teamId}`
+                : "Slack not connected"
+            }
+          >
+            <span className={slackStatus?.connected ? "slack-dot-active" : "slack-dot-inactive"} />
+            <span className="nav-slack-text">
+              {slackStatus?.connected
+                ? (slackStatus.teamName ? `Slack: ${slackStatus.teamName}` : "Slack: Connected")
+                : "Slack: Disconnected"}
+            </span>
+          </div>
+
           <button
             id="nav-compose-btn"
             onClick={() => setIsComposeOpen(true)}
@@ -368,6 +394,19 @@ export const DashboardPage: React.FC = () => {
               {activeCount > 0 ? "Verified SMTP credentials" : "SMTP configuration required"}
             </div>
           </div>
+        </section>
+
+        {/* Slack Workspace Integration Section */}
+        <section className="integrations-section">
+          <SlackConnectionCard
+            onStatusChange={(status) =>
+              setSlackStatus({
+                connected: status.connected,
+                teamName: status.teamName,
+                teamId: status.teamId,
+              })
+            }
+          />
         </section>
 
         {/* Sender & Pipeline Section */}

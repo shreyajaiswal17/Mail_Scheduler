@@ -1,5 +1,6 @@
 import "dotenv/config";
 import jwt from "jsonwebtoken";
+import { getJwtSecret } from "../config/jwt";
 import { searchUserEmails } from "../services/email-search.service";
 import { prisma } from "../lib/prisma";
 
@@ -74,7 +75,7 @@ async function runSearchVerification() {
   console.log("SUCCESS: Cross-tenant isolation strictly verified (another user cannot retrieve it).");
 
   console.log("\n=== 5. HTTP API Endpoint Verification ===");
-  const JWT_SECRET = process.env.JWT_SECRET || "mail_scheduler_jwt_secret_change_in_production";
+  const JWT_SECRET = getJwtSecret();
   const ownerToken = jwt.sign(
     { userId: ownerUserId, email: "owner@example.com" },
     JWT_SECRET,
@@ -87,7 +88,7 @@ async function runSearchVerification() {
     { expiresIn: "1h" }
   );
 
-  const serverUrl = "http://127.0.0.1:5000";
+  const serverUrl = "http://localhost:5000";
   const httpResponse = await fetch(
     `${serverUrl}/api/emails/search?q=Restart+Persistence+Test&status=SENT`,
     {
