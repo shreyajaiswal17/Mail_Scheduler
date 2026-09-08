@@ -210,11 +210,17 @@ export const setSlackChannelController = async (
     const { setSlackNotificationChannel } = await import("../services/slack.service");
     const result = await setSlackNotificationChannel(userId, channel.trim());
 
+    const channelLabel = result.channelName ? `#${result.channelName}` : result.channelId;
+    const message = result.isMember === false
+      ? `Notification channel set to ${channelLabel}. Note: please invite @Mail Scheduler to ${channelLabel} in Slack to receive alerts.`
+      : `Notification channel set to ${channelLabel}`;
+
     res.status(200).json({
       success: true,
-      message: `Notification channel set to ${result.channelName ? `#${result.channelName}` : result.channelId}`,
+      message,
       channelId: result.channelId,
       channelName: result.channelName,
+      isMember: result.isMember,
     });
   } catch (error: any) {
     console.error("[Slack Controller] Error setting channel:", error?.message || error);

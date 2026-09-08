@@ -83,7 +83,9 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
   const [isSavingChannel, setIsSavingChannel] = useState<boolean>(false);
   const [isSendingTest, setIsSendingTest] = useState<boolean>(false);
   const [channelSuccessMessage, setChannelSuccessMessage] = useState<string | null>(null);
+  const [channelErrorMessage, setChannelErrorMessage] = useState<string | null>(null);
   const [testNotificationMessage, setTestNotificationMessage] = useState<string | null>(null);
+  const [testErrorMessage, setTestErrorMessage] = useState<string | null>(null);
 
   const onStatusChangeRef = useRef(onStatusChange);
   useEffect(() => {
@@ -207,15 +209,17 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
   const handleSaveChannel = async () => {
     const channelToSave = useCustomChannel ? customChannelInput.trim() : selectedChannel;
     if (!channelToSave) {
-      setErrorMessage("Please select or enter a Slack channel");
+      setChannelErrorMessage("Please select or enter a Slack channel before clicking Save.");
       return;
     }
 
     try {
       setIsSavingChannel(true);
       setErrorMessage(null);
+      setChannelErrorMessage(null);
       setChannelSuccessMessage(null);
       setTestNotificationMessage(null);
+      setTestErrorMessage(null);
 
       const res = await fetch(`${API_BASE_URL}/api/slack/channel`, {
         method: "POST",
@@ -242,17 +246,24 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
       fetchStatus(false);
     } catch (err: any) {
       console.error("[Slack] Failed to save channel:", err);
-      setErrorMessage(err.message || "Failed to save channel");
+      setChannelErrorMessage(err.message || "Failed to save channel");
     } finally {
       setIsSavingChannel(false);
     }
   };
 
   const handleSendTestNotification = async () => {
+    if (!status?.channelId) {
+      setTestErrorMessage("No notification channel configured. Please choose a channel and click 'Save Channel' first.");
+      return;
+    }
+
     try {
       setIsSendingTest(true);
       setErrorMessage(null);
       setTestNotificationMessage(null);
+      setTestErrorMessage(null);
+      setChannelErrorMessage(null);
 
       const res = await fetch(`${API_BASE_URL}/api/slack/test-notification`, {
         method: "POST",
@@ -268,7 +279,7 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
       setTestNotificationMessage(data.message || "Test alert delivered successfully to Slack!");
     } catch (err: any) {
       console.error("[Slack] Test notification failed:", err);
-      setErrorMessage(err.message || "Failed to send test alert to Slack");
+      setTestErrorMessage(err.message || "Failed to send test alert to Slack");
     } finally {
       setIsSendingTest(false);
     }
@@ -280,7 +291,9 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
       setErrorMessage(null);
       setSuccessMessage(null);
       setChannelSuccessMessage(null);
+      setChannelErrorMessage(null);
       setTestNotificationMessage(null);
+      setTestErrorMessage(null);
 
       const res = await fetch(`${API_BASE_URL}/api/slack/disconnect`, {
         method: "POST",
@@ -473,16 +486,70 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
               </p>
 
               {channelSuccessMessage && (
-                <div className="flex items-center gap-2 p-2.5 mb-3 rounded-xl text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 animate-fade-in">
-                  <CheckCircle2 size={15} />
-                  <span>{channelSuccessMessage}</span>
+                <div className="flex items-center justify-between p-3 mb-3.5 rounded-xl text-sm bg-emerald-50 border border-emerald-200 text-emerald-800 animate-fade-in">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                    <span>{channelSuccessMessage}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setChannelSuccessMessage(null)}
+                    className="text-emerald-500 hover:text-emerald-800 cursor-pointer p-0.5"
+                    title="Dismiss"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              {channelErrorMessage && (
+                <div className="flex items-center justify-between p-3 mb-3.5 rounded-xl text-sm bg-red-50 border border-red-200 text-red-800 animate-fade-in">
+                  <div className="flex items-center gap-2.5">
+                    <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+                    <span>{channelErrorMessage}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setChannelErrorMessage(null)}
+                    className="text-red-500 hover:text-red-800 cursor-pointer p-0.5"
+                    title="Dismiss"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               )}
 
               {testNotificationMessage && (
-                <div className="flex items-center gap-2 p-2.5 mb-3 rounded-xl text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 animate-fade-in">
-                  <CheckCircle2 size={15} />
-                  <span>{testNotificationMessage}</span>
+                <div className="flex items-center justify-between p-3 mb-3.5 rounded-xl text-sm bg-emerald-50 border border-emerald-200 text-emerald-800 animate-fade-in">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                    <span>{testNotificationMessage}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTestNotificationMessage(null)}
+                    className="text-emerald-500 hover:text-emerald-800 cursor-pointer p-0.5"
+                    title="Dismiss"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              {testErrorMessage && (
+                <div className="flex items-center justify-between p-3 mb-3.5 rounded-xl text-sm bg-red-50 border border-red-200 text-red-800 animate-fade-in">
+                  <div className="flex items-center gap-2.5">
+                    <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+                    <span>{testErrorMessage}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTestErrorMessage(null)}
+                    className="text-red-500 hover:text-red-800 cursor-pointer p-0.5"
+                    title="Dismiss"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               )}
 
@@ -558,8 +625,8 @@ export const SlackConnectionCard: React.FC<SlackConnectionCardProps> = ({ onStat
                     id="send-slack-test-btn"
                     className="bg-white border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold text-sm px-4 py-2 rounded-xl inline-flex items-center gap-1.5 transition cursor-pointer"
                     onClick={handleSendTestNotification}
-                    disabled={isSendingTest || !status?.channelId}
-                    title={!status?.channelId ? "Please save a channel first" : "Send a live test alert to Slack"}
+                    disabled={isSendingTest}
+                    title={!status?.channelId ? "Please save a channel first to send a test alert" : "Send a live test alert to Slack"}
                   >
                     {isSendingTest ? (
                       <>

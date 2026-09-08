@@ -227,7 +227,7 @@ export async function listSlackChannels(userId: string): Promise<Array<{ id: str
 export async function setSlackNotificationChannel(
   userId: string,
   channelInput: string
-): Promise<{ channelId: string; channelName: string }> {
+): Promise<{ channelId: string; channelName: string; isMember?: boolean }> {
   const token = await getDecryptedBotToken(userId);
   if (!token) {
     throw new Error("Slack workspace is not connected");
@@ -250,7 +250,7 @@ export async function setSlackNotificationChannel(
     // Join channel if bot is not already a member
     if (!matched.is_member) {
       try {
-        await fetch(SLACK_CONVERSATIONS_JOIN_URL, {
+        const joinRes = await fetch(SLACK_CONVERSATIONS_JOIN_URL, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -258,6 +258,14 @@ export async function setSlackNotificationChannel(
           },
           body: JSON.stringify({ channel: targetChannelId }),
         });
+        const joinData = await joinRes.json();
+        if (!joinData.ok) {
+          console.warn(
+            `[Slack] Auto-join for channel ${targetChannelId} returned ok=false (${joinData.error || "failed"}). Bot must be invited manually to the channel.`
+          );
+        } else {
+          matched.is_member = true;
+        }
       } catch (joinErr) {
         console.warn(`[Slack] Auto-join for channel ${targetChannelId} non-fatal warning:`, joinErr);
       }
@@ -279,7 +287,11 @@ export async function setSlackNotificationChannel(
     },
   });
 
-  return { channelId: targetChannelId, channelName: targetChannelName };
+  return {
+    channelId: targetChannelId,
+    channelName: targetChannelName,
+    isMember: Boolean(matched?.is_member),
+  };
 }
 
 /**
@@ -435,7 +447,18 @@ export async function sendSlackTestNotification(userId: string): Promise<{ succe
 
   const delivered = await deliverSlackNotification(outbox.id);
   if (!delivered) {
-    throw new Error("Failed to deliver test notification to Slack. Please ensure the bot is added to the channel.");
+    const updatedOutbox = await prisma.slackNotificationOutbox.findUnique({
+      where: { id: outbox.id },
+    });
+    const slackError = updatedOutbox?.lastError;
+    if (slackError === "not_in_channel") {
+      throw new Error(
+        `The Mail Scheduler bot is not in ${channelDisplay}. In Slack, please open ${channelDisplay} and invite the bot by typing "/invite @Mail Scheduler" (or adding the Mail Scheduler app), then try again.`
+      );
+    }
+    throw new Error(
+      `Failed to deliver test notification to ${channelDisplay} (${slackError || "dispatch failed"}). Please verify bot permissions and channel membership.`
+    );
   }
 
   return { success: true, channel: channelDisplay };
