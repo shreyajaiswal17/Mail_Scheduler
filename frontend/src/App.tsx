@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { Mail } from "lucide-react";
-import "./App.css";
 
 const MainContent: React.FC = () => {
   const { user, isLoading } = useAuth();
