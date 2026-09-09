@@ -619,18 +619,18 @@ export const DashboardPage: React.FC = () => {
                   </div>
                 ) : displayedEmails.length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-center py-20 text-gray-500">
-                    <Mail size={36} className="text-gray-300 mb-3" />
-                    <h4 className="text-base font-semibold text-gray-800 mb-1">
+                    <Mail size={44} className="text-gray-300 mb-3.5" />
+                    <h4 className="text-xl sm:text-2xl font-bold font-display text-gray-900 mb-2">
                       No {activeTab} emails found
                     </h4>
-                    <p className="text-xs text-gray-400 max-w-sm mb-4">
+                    <p className="text-base text-gray-500 max-w-md mb-5 leading-relaxed">
                       {searchQuery
                         ? `No results match "${searchQuery}"`
                         : `Your ${activeTab} mailbox is currently empty. Click Compose to schedule an email.`}
                     </p>
                     <button
                       type="button"
-                      className="bg-emerald-600 text-white px-4 py-2 rounded-full text-xs font-semibold hover:bg-emerald-700 transition cursor-pointer shadow-xs"
+                      className="bg-emerald-600 text-white px-6 py-2.5 rounded-full text-[15px] font-semibold hover:bg-emerald-700 transition cursor-pointer shadow-xs"
                       onClick={() => setIsComposeOpen(true)}
                     >
                       Compose Email
@@ -719,20 +719,20 @@ export const DashboardPage: React.FC = () => {
                       <span>Loading senders...</span>
                     </div>
                   ) : senders.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-12 text-gray-500">
-                      <Server size={36} className="text-gray-300 mb-3" />
-                      <h4 className="text-sm font-semibold text-gray-800 mb-1">
+                    <div className="flex flex-col items-center justify-center text-center py-14 text-gray-500">
+                      <Server size={44} className="text-gray-300 mb-3.5" />
+                      <h4 className="text-xl font-bold font-display text-gray-900 mb-2">
                         No Senders Configured
                       </h4>
-                      <p className="text-xs text-gray-400 max-w-sm mb-4">
+                      <p className="text-base text-gray-500 max-w-md mb-5 leading-relaxed">
                         Add your SMTP credentials (e.g. Ethereal, Gmail, Sendgrid) to start scheduling campaigns.
                       </p>
                       <button
                         type="button"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-full inline-flex items-center gap-1.5 transition cursor-pointer"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[15px] px-6 py-2.5 rounded-full inline-flex items-center gap-2 transition cursor-pointer shadow-xs"
                         onClick={() => handleOpenSenderModal()}
                       >
-                        <Plus size={15} />
+                        <Plus size={16} />
                         <span>Add Sender Now</span>
                       </button>
                     </div>
