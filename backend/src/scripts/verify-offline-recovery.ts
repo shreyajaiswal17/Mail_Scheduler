@@ -124,10 +124,8 @@ async function verifyOfflineRecovery() {
     throw new Error(`FAILED: Expected status SENT, found ${finalSource?.status}`);
   }
 
-  console.log("\n==================================================================");
-  console.log("SUCCESS: Offline status change was durably recovered after outage!");
+  console.log("\nOffline status change was durably recovered after outage.");
   console.log("Equal counts did not mask the stale state, and external_gte ensured clean sync.");
-  console.log("==================================================================");
 
   await esClient.close();
   process.exit(0);

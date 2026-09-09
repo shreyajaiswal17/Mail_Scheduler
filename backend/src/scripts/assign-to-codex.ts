@@ -29,7 +29,6 @@ async function main() {
     });
   }
 
-  // Update all campaigns to targetUser.id and sender.id
   await prisma.emailCampaign.updateMany({
     data: {
       userId: targetUser.id,
@@ -37,7 +36,6 @@ async function main() {
     },
   });
 
-  // Update all email jobs to sender.id
   await prisma.emailJob.updateMany({
     data: {
       senderId: sender.id,
@@ -45,7 +43,6 @@ async function main() {
     },
   });
 
-  // Fetch all jobs
   const jobs = await prisma.emailJob.findMany({
     include: { campaign: true },
   });

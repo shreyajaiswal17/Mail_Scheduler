@@ -185,9 +185,7 @@ async function runSlackVerification() {
   }
   console.log("SUCCESS: Disconnection verified in PostgreSQL.");
 
-  console.log("\n==================================================================");
-  console.log("ALL SLACK OAUTH VERIFICATIONS PASSED!");
-  console.log("==================================================================");
+  console.log("\nAll Slack OAuth verifications passed.");
 
   await prisma.$disconnect();
 }

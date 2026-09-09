@@ -206,9 +206,6 @@ export async function getDecryptedBotToken(userId: string): Promise<string | nul
   return decryptToken(connection.accessToken);
 }
 
-/**
- * Lists available public and private Slack channels accessible by the workspace bot.
- */
 export async function listSlackChannels(userId: string): Promise<Array<{ id: string; name: string; is_private: boolean; is_member: boolean }>> {
   const token = await getDecryptedBotToken(userId);
   if (!token) {
@@ -232,9 +229,6 @@ export async function listSlackChannels(userId: string): Promise<Array<{ id: str
   }));
 }
 
-/**
- * Resolves a channel name or ID to an active channel ID and saves it to PostgreSQL.
- */
 export async function setSlackNotificationChannel(
   userId: string,
   channelInput: string
@@ -258,7 +252,6 @@ export async function setSlackNotificationChannel(
     targetChannelId = matched.id;
     targetChannelName = matched.name;
 
-    // Join channel if bot is not already a member
     if (!matched.is_member) {
       try {
         const joinRes = await fetch(SLACK_CONVERSATIONS_JOIN_URL, {
@@ -282,7 +275,6 @@ export async function setSlackNotificationChannel(
       }
     }
   } else if (/^[A-Z0-9]{8,12}$/.test(channelInput.trim())) {
-    // If user entered a direct channel ID (e.g. C0C0761S84B) not yet in cache
     targetChannelId = channelInput.trim();
     targetChannelName = "channel";
   } else {
@@ -305,9 +297,6 @@ export async function setSlackNotificationChannel(
   };
 }
 
-/**
- * Sends a real Slack message via chat.postMessage using decrypted bot token.
- */
 export async function postSlackMessage(
   userId: string,
   channelId: string,
@@ -344,9 +333,6 @@ export async function postSlackMessage(
   return { ok: true, ts: data.ts, channel: data.channel };
 }
 
-/**
- * Attempts delivery for a SlackNotificationOutbox record with bounded retries.
- */
 export async function deliverSlackNotification(outboxId: string): Promise<boolean> {
   const record = await prisma.slackNotificationOutbox.findUnique({
     where: { id: outboxId },
@@ -359,7 +345,6 @@ export async function deliverSlackNotification(outboxId: string): Promise<boolea
   try {
     const payload = record.payload as any;
 
-    // Dynamically query latest user connection so channel updates and disconnects take effect immediately
     const connection = await prisma.slackConnection.findUnique({
       where: { userId: record.userId },
     });
@@ -402,7 +387,7 @@ export async function deliverSlackNotification(outboxId: string): Promise<boolea
   } catch (err: any) {
     const nextAttempts = record.attempts + 1;
     const isExhausted = nextAttempts >= record.maxAttempts;
-    const backoffMs = Math.pow(3, nextAttempts) * 3000; // 9s, 27s
+    const backoffMs = Math.pow(3, nextAttempts) * 3000;
 
     await prisma.slackNotificationOutbox.update({
       where: { id: outboxId },
@@ -463,7 +448,6 @@ export async function sendSlackTestNotification(userId: string): Promise<{ succe
     },
   ];
 
-  // Create durable intent in outbox
   const outbox = await prisma.slackNotificationOutbox.create({
     data: {
       userId,
@@ -496,10 +480,6 @@ export async function sendSlackTestNotification(userId: string): Promise<{ succe
   return { success: true, channel: channelDisplay };
 }
 
-/**
- * Emits an hourly sending limit alert to Slack when Redis rate limiter returns SENDER_HOURLY_LIMIT.
- * Completely non-blocking and safe: deduplicates per user, sender, and hour.
- */
 export async function notifySenderHourlyLimit(
   data: HourlyLimitAlertData
 ): Promise<{ dispatched: boolean; reason?: string }> {
@@ -508,13 +488,11 @@ export async function notifySenderHourlyLimit(
     const windowStartMs = Math.floor(Date.now() / ONE_HOUR_MS) * ONE_HOUR_MS;
     const dedupKey = `slack:dedup:${data.userId}:sender:${data.senderId}:${windowStartMs}`;
 
-    // 1. Hourly Window Deduplication for Sender Global Limit
     const acquired = await redis.set(dedupKey, "1", "EX", 7200, "NX");
     if (!acquired) {
       return { dispatched: false, reason: "DEDUPLICATED" };
     }
 
-    // 2. Dynamic Connection & Channel Check
     const connection = await prisma.slackConnection.findUnique({
       where: { userId: data.userId },
     });
@@ -528,14 +506,14 @@ export async function notifySenderHourlyLimit(
       : data.senderEmail;
     const nextTimeStr = new Date(data.nextEligibleTime).toUTCString();
 
-    const text = `⚠️ Global hourly sending limit reached for sender ${senderDisplay}. Limit: ${data.hourlyLimit}/hr. Next eligible dispatch: ${nextTimeStr}.`;
+    const text = `Global hourly sending limit reached for sender ${senderDisplay}. Limit: ${data.hourlyLimit}/hr. Next eligible dispatch: ${nextTimeStr}.`;
     const blocks = [
       {
         type: "header",
         text: {
           type: "plain_text",
-          text: "⚠️ Sender Global Hourly Limit Reached",
-          emoji: true,
+          text: "Sender Global Hourly Limit Reached",
+          emoji: false,
         },
       },
       {
@@ -575,7 +553,6 @@ export async function notifySenderHourlyLimit(
       },
     ];
 
-    // 3. Durable Outbox Intent
     const outbox = await prisma.slackNotificationOutbox.create({
       data: {
         userId: data.userId,
@@ -598,7 +575,6 @@ export async function notifySenderHourlyLimit(
       },
     });
 
-    // 4. Asynchronous delivery attempt
     deliverSlackNotification(outbox.id).catch((err) => {
       console.warn("[Slack] Outbox immediate delivery error for sender alert:", err?.message || err);
     });
@@ -610,11 +586,6 @@ export async function notifySenderHourlyLimit(
   }
 }
 
-/**
- * Emits an hourly sending limit alert to Slack when Redis rate limiter returns CAMPAIGN_HOURLY_LIMIT.
- * Completely non-blocking and safe: deduplicates per user, campaign, and hour.
- * Preserves the distinction between global sender limits and campaign-specific limits.
- */
 export async function notifyCampaignHourlyLimit(
   data: CampaignHourlyLimitAlertData
 ): Promise<{ dispatched: boolean; reason?: string }> {
@@ -623,13 +594,11 @@ export async function notifyCampaignHourlyLimit(
     const windowStartMs = Math.floor(Date.now() / ONE_HOUR_MS) * ONE_HOUR_MS;
     const dedupKey = `slack:dedup:${data.userId}:campaign:${data.campaignId}:${windowStartMs}`;
 
-    // 1. Hourly Window Deduplication per Campaign
     const acquired = await redis.set(dedupKey, "1", "EX", 7200, "NX");
     if (!acquired) {
       return { dispatched: false, reason: "DEDUPLICATED" };
     }
 
-    // 2. Dynamic Connection & Channel Check
     const connection = await prisma.slackConnection.findUnique({
       where: { userId: data.userId },
     });
@@ -646,14 +615,14 @@ export async function notifyCampaignHourlyLimit(
       : data.senderEmail;
     const nextTimeStr = new Date(data.nextEligibleTime).toUTCString();
 
-    const text = `⚠️ Hourly sending limit reached for campaign "${campaignDisplay}". Limit: ${data.hourlyLimit}/hr. Next eligible dispatch: ${nextTimeStr}.`;
+    const text = `Hourly sending limit reached for campaign "${campaignDisplay}". Limit: ${data.hourlyLimit}/hr. Next eligible dispatch: ${nextTimeStr}.`;
     const blocks = [
       {
         type: "header",
         text: {
           type: "plain_text",
-          text: "⚠️ Campaign Hourly Sending Limit Reached",
-          emoji: true,
+          text: "Campaign Hourly Sending Limit Reached",
+          emoji: false,
         },
       },
       {
@@ -693,7 +662,6 @@ export async function notifyCampaignHourlyLimit(
       },
     ];
 
-    // 3. Durable Outbox Intent
     const outbox = await prisma.slackNotificationOutbox.create({
       data: {
         userId: data.userId,
@@ -718,7 +686,6 @@ export async function notifyCampaignHourlyLimit(
       },
     });
 
-    // 4. Asynchronous delivery attempt
     deliverSlackNotification(outbox.id).catch((err) => {
       console.warn("[Slack] Outbox immediate delivery error for campaign alert:", err?.message || err);
     });
@@ -730,9 +697,6 @@ export async function notifyCampaignHourlyLimit(
   }
 }
 
-/**
- * Sweeps and retries any pending notifications whose nextAttemptAt is past due.
- */
 export async function retryPendingSlackNotifications(): Promise<number> {
   const pending = await prisma.slackNotificationOutbox.findMany({
     where: {

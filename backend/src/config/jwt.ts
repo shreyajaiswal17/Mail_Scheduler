@@ -2,10 +2,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-/**
- * Retrieves the required JWT_SECRET environment variable.
- * Throws a fatal error if the variable is missing or empty.
- */
 export const getJwtSecret = (): string => {
   const secret = process.env.JWT_SECRET?.trim();
   if (!secret) {
@@ -16,10 +12,6 @@ export const getJwtSecret = (): string => {
   return secret;
 };
 
-/**
- * Validates that JWT_SECRET is configured at server startup.
- * Fails fast with a clear diagnostic message if missing.
- */
 export const assertJwtSecret = (): void => {
   try {
     getJwtSecret();

@@ -35,8 +35,6 @@ async function runSearchVerification() {
     throw new Error("FAILED: Search did not return the expected 'Restart Persistence Test' email!");
   }
   console.log(`SUCCESS: Found email subject '${matched.subject}', recipient: ${matched.recipientEmail}, status: ${matched.status}`);
-
-  // Verify safe email fields
   const anyMatched = matched as any;
   if (anyMatched.smtpPasswordEnc || anyMatched.smtpPassword || anyMatched.accessToken || anyMatched.password) {
     throw new Error("FAILED: Leak detected in search results!");
@@ -126,10 +124,7 @@ async function runSearchVerification() {
     }
     console.log("SUCCESS: Foreign user received 0 hits via HTTP endpoint.");
   }
-
-  console.log("\n==================================================================");
-  console.log("ALL EMAIL SEARCH VERIFICATIONS PASSED!");
-  console.log("==================================================================");
+  console.log("\nAll email search verifications passed.");
 
   await prisma.$disconnect();
 }

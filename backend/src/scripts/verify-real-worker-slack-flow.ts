@@ -15,11 +15,9 @@ async function sleep(ms: number) {
 }
 
 async function runControlledVerification() {
-  console.log("====================================================================");
-  console.log("  REAL WORKER SLACK HOURLY-LIMIT INTEGRATION TEST");
-  console.log("====================================================================\n");
 
-  // Step 1: User and Slack Connection Setup
+  console.log("  REAL WORKER SLACK HOURLY-LIMIT INTEGRATION TEST");
+
   const user = await prisma.user.findFirst({
     where: { email: "codex1712@gmail.com" },
     include: {
@@ -48,15 +46,11 @@ async function runControlledVerification() {
   console.log(`[Setup] Active Channel: #${user.slackConnection.channelName} (${originalChannelId})`);
   console.log(`[Setup] Active Sender: ${activeSender.name} (${activeSender.email})`);
 
-  // Record initial count of Slack outbox items
   const initialOutboxCount = await prisma.slackNotificationOutbox.count({
     where: { userId: user.id },
   });
   console.log(`[Setup] Current Slack Outbox Count: ${initialOutboxCount}\n`);
 
-  // ============================================================================
-  // TEST 1: REAL WORKER PROCESSING WITH CAMPAIGN HOURLY LIMIT = 1
-  // ============================================================================
   console.log("--- TEST 1: Real Worker Campaign Hourly Limit Exhaustion Flow ---");
   const testCampaign = await prisma.emailCampaign.create({
     data: {
@@ -66,12 +60,11 @@ async function runControlledVerification() {
       body: "Controlled test body for hourly-limit worker flow",
       startTime: new Date(),
       delayMs: 1000,
-      hourlyLimit: 1, // Crucial: limit is 1 email per hour
+      hourlyLimit: 1,
     },
   });
   console.log(`[Test 1] Created test campaign ${testCampaign.id} with hourlyLimit = 1, delayMs = 1000`);
 
-  // Create 3 email jobs in DB
   const emailJob1 = await prisma.emailJob.create({
     data: {
       campaignId: testCampaign.id,
@@ -112,7 +105,6 @@ async function runControlledVerification() {
   console.log(`  - Job 2: ${emailJob2.id}`);
   console.log(`  - Job 3: ${emailJob3.id}`);
 
-  // Enqueue jobs into BullMQ emailQueue
   console.log(`[Test 1] Enqueuing jobs into BullMQ 'email-sending' queue...`);
   await emailQueue.add("send-email", { emailId: emailJob1.id }, { jobId: emailJob1.id });
   await emailQueue.add("send-email", { emailId: emailJob2.id }, { jobId: emailJob2.id });
@@ -158,11 +150,9 @@ async function runControlledVerification() {
     }
   }
 
-  console.log("✅ Worker correctly allowed exactly 1 email (hourly limit: 1) and delayed remaining 2 with CAMPAIGN_HOURLY_LIMIT!");
+  console.log("Worker correctly allowed exactly 1 email (hourly limit: 1) and delayed remaining 2 with CAMPAIGN_HOURLY_LIMIT!");
 
-  // Verify Slack Outbox intent created by Worker for this campaign
   console.log(`\n[Test 1 Slack Check] Querying SlackNotificationOutbox for campaign ${testCampaign.id}...`);
-  // Wait up to 5s for asynchronous outbox delivery
   await sleep(3000);
 
   const campaignOutboxRecords = await prisma.slackNotificationOutbox.findMany({
@@ -193,12 +183,9 @@ async function runControlledVerification() {
     }
   }
 
-  console.log("✅ Worker triggered durable Slack outbox record with eventType = CAMPAIGN_HOURLY_LIMIT, delivered to Slack (#mail-scheduler-alerts) with status = DISPATCHED!");
-  console.log("✅ Deduplication verified: Job 3 in the same hourly window did NOT generate duplicate Slack alerts!\n");
+  console.log(" Worker triggered durable Slack outbox record with eventType = CAMPAIGN_HOURLY_LIMIT, delivered to Slack (#mail-scheduler-alerts) with status = DISPATCHED!");
+  console.log(" Deduplication verified: Job 3 in the same hourly window did NOT generate duplicate Slack alerts!\n");
 
-  // ============================================================================
-  // TEST 2: SENDER GLOBAL LIMIT VS CAMPAIGN LIMIT DISTINCTION & DEDUPLICATION
-  // ============================================================================
   console.log("--- TEST 2: Sender Global Limit vs Campaign Limit Distinction ---");
   const senderTestTime = Date.now() + 60 * 60 * 1000;
   const senderAlert1 = await notifySenderHourlyLimit({
@@ -211,7 +198,6 @@ async function runControlledVerification() {
   });
   console.log(`[Test 2] First SENDER_HOURLY_LIMIT trigger:`, senderAlert1);
 
-  // Immediate second call should be DEDUPLICATED
   const senderAlert2 = await notifySenderHourlyLimit({
     userId: user.id,
     senderId: activeSender.id,
@@ -226,7 +212,6 @@ async function runControlledVerification() {
     throw new Error(`Expected SENDER_HOURLY_LIMIT to deduplicate, got ${senderAlert2.reason}`);
   }
 
-  // Verify that campaign notification with same sender is NOT blocked by sender deduplication
   const campaignAlertAnother = await notifyCampaignHourlyLimit({
     userId: user.id,
     campaignId: "distinct-campaign-" + Date.now(),
@@ -241,11 +226,8 @@ async function runControlledVerification() {
   if (!campaignAlertAnother.dispatched) {
     throw new Error(`Campaign alert was incorrectly blocked by sender limit dedup!`);
   }
-  console.log("✅ Global sender limit and campaign limit have independent deduplication keys and distinct eventTypes!\n");
+  console.log(" Global sender limit and campaign limit have independent deduplication keys and distinct eventTypes!\n");
 
-  // ============================================================================
-  // TEST 3: OUTBOX RECOVERY FROM TEMPORARY FAILURES
-  // ============================================================================
   console.log("--- TEST 3: Outbox Recovery from Temporary Slack Failure ---");
   const tempOutbox = await prisma.slackNotificationOutbox.create({
     data: {
@@ -259,16 +241,16 @@ async function runControlledVerification() {
             type: "section",
             text: {
               type: "mrkdwn",
-              text: "✅ *Outbox Recovery Test:* Transient failure successfully recovered via retry sweep.",
+              text: "*Outbox Recovery Test:* Transient failure successfully recovered via retry sweep.",
             },
           },
         ],
       },
       status: "PENDING",
-      attempts: 1, // Simulated 1 failed attempt
+      attempts: 1,
       maxAttempts: 3,
       lastError: "Simulated temporary Slack network timeout",
-      nextAttemptAt: new Date(Date.now() - 5000), // Past due
+      nextAttemptAt: new Date(Date.now() - 5000),
     },
   });
   console.log(`[Test 3] Created PENDING outbox record with simulated past-due nextAttemptAt: ${tempOutbox.id}`);
@@ -284,19 +266,14 @@ async function runControlledVerification() {
   if (recoveredOutbox?.status !== "DISPATCHED") {
     throw new Error(`Expected temporary failure outbox to be DISPATCHED, got ${recoveredOutbox?.status}`);
   }
-  console.log("✅ Outbox retry mechanism successfully recovers from temporary delivery failures!\n");
+  console.log("Outbox retry mechanism successfully recovers from temporary delivery failures!\n");
 
-  // ============================================================================
-  // TEST 4: DYNAMIC CHANNEL CHANGES & DISCONNECT SAFETY
-  // ============================================================================
   console.log("--- TEST 4: Dynamic Channel Configuration & Disconnect Safety ---");
-  // 4a. Verify dynamic channel resolution: Outbox record created with stale channel ID
-  // dynamically reads latest connection.channelId at delivery time.
   console.log(`[Test 4a] Testing dynamic channel override from stale outbox record...`);
   const staleChannelOutbox = await prisma.slackNotificationOutbox.create({
     data: {
       userId: user.id,
-      channelId: "C_STALE_OLD_CHANNEL", // Stale channel in old record
+      channelId: "C_STALE_OLD_CHANNEL",
       eventType: "CAMPAIGN_HOURLY_LIMIT",
       payload: {
         text: "Dynamic channel update verification",
@@ -305,7 +282,7 @@ async function runControlledVerification() {
             type: "section",
             text: {
               type: "mrkdwn",
-              text: "✅ *Dynamic Channel Verification:* Successfully routed to latest configured channel.",
+              text: "*Dynamic Channel Verification:* Successfully routed to latest configured channel.",
             },
           },
         ],
@@ -331,7 +308,6 @@ async function runControlledVerification() {
     throw new Error(`Expected outbox to update channelId to ${originalChannelId} and be DISPATCHED`);
   }
 
-  // 4b. Test setSlackNotificationChannel service API
   console.log(`[Test 4b] Testing setSlackNotificationChannel service API with 'mail-scheduler-alerts'...`);
   const setChannelRes = await setSlackNotificationChannel(user.id, "mail-scheduler-alerts");
   console.log(`[Test 4b] setSlackNotificationChannel response:`, setChannelRes);
@@ -339,7 +315,6 @@ async function runControlledVerification() {
     throw new Error(`Expected setSlackNotificationChannel to return ${originalChannelId}`);
   }
 
-  // 4c. Disconnect safety test: outbox delivery when user is disconnected
   console.log(`[Test 4c] Verifying graceful disconnect safety (non-existent user connection)...`);
   const disconnectedOutbox = await prisma.slackNotificationOutbox.create({
     data: {
@@ -363,11 +338,8 @@ async function runControlledVerification() {
   if (disconnectedFinal?.status !== "FAILED" || !disconnectedFinal.lastError?.includes("disconnected")) {
     throw new Error(`Expected FAILED with disconnected message, got: ${disconnectedFinal?.lastError}`);
   }
-  console.log("✅ Channel updates take effect dynamically and disconnects fail gracefully without crashing!\n");
+  console.log("Channel updates take effect dynamically and disconnects fail gracefully without crashing!\n");
 
-  // ============================================================================
-  // CLEANUP: Clean up test artifacts without disturbing existing scheduled data
-  // ============================================================================
   console.log("--- CLEANUP ---");
   await prisma.emailJob.deleteMany({
     where: { id: { in: [emailJob1.id, emailJob2.id, emailJob3.id] } },
@@ -378,11 +350,11 @@ async function runControlledVerification() {
   await prisma.slackNotificationOutbox.deleteMany({
     where: { id: { in: [tempOutbox.id, staleChannelOutbox.id, disconnectedOutbox.id, ...campaignOutboxRecords.map((r) => r.id)] } },
   });
-  console.log("✅ Cleaned up temporary test campaign and jobs; existing scheduled jobs remain untouched.");
+  console.log(" Cleaned up temporary test campaign and jobs; existing scheduled jobs remain untouched.");
 
-  console.log("\n====================================================================");
+ 
   console.log("  ALL TESTS PASSED: REAL WORKER SLACK INTEGRATION VERIFIED 100%");
-  console.log("====================================================================");
+
 
   await prisma.$disconnect();
   redis.disconnect();
@@ -391,7 +363,7 @@ async function runControlledVerification() {
 runControlledVerification()
   .then(() => process.exit(0))
   .catch(async (err) => {
-    console.error("❌ VERIFICATION TEST FAILED:", err);
+    console.error("VERIFICATION TEST FAILED:", err);
     await prisma.$disconnect();
     redis.disconnect();
     process.exit(1);

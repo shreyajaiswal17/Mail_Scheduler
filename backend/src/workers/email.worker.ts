@@ -194,7 +194,6 @@ export const emailWorker = new Worker(
         `[Rate Limiter] Sender ${sender.email} rate-limited (${reservation.reason}). Delaying job ${job.id} for ${reservation.retryAfterMs}ms (until ${new Date(nextEligibleTime).toISOString()}).`
       );
 
-      // Trigger Slack notification asynchronously and safely if sender or campaign hourly limit is reached
       if (reservation.reason === "SENDER_HOURLY_LIMIT") {
         notifySenderHourlyLimit({
           userId: sender.userId,

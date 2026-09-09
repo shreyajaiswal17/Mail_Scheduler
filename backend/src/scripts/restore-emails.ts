@@ -5,7 +5,6 @@ import { esClient, ELASTICSEARCH_INDEX, initEmailIndex, toElasticEmailDoc } from
 async function restore() {
   console.log("Restoring sent emails in database and Elasticsearch...");
 
-  // 1. Get the current user
   let user = await prisma.user.findFirst({
     orderBy: { createdAt: "desc" },
     include: { senders: true },

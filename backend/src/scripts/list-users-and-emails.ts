@@ -22,7 +22,6 @@ async function main() {
     console.log(`  Emails in DB: ${emailCount}`);
   }
 
-  // Also check Elasticsearch documents
   const esResult = await esClient.search({
     index: ELASTICSEARCH_INDEX,
     size: 20,

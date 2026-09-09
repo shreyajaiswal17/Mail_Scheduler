@@ -182,7 +182,6 @@ export const emailLogin = async (req: Request, res: Response): Promise<void> => 
     const cleanEmail = email.trim().toLowerCase();
     const name = cleanEmail.split("@")[0];
 
-    // Find or create user
     let user = await prisma.user.findUnique({
       where: { email: cleanEmail },
     });
@@ -196,7 +195,6 @@ export const emailLogin = async (req: Request, res: Response): Promise<void> => 
         },
       });
 
-      // Provision default sender
       await prisma.sender.upsert({
         where: {
           userId_email: {

@@ -27,10 +27,8 @@ app.use(
 );
 app.use(cookieParser());
 app.use(express.json());
-
-// Routes
 app.use("/api/auth", authRoutes);
-app.use("/auth", authRoutes); // Fallback alias for convenience
+app.use("/auth", authRoutes);
 app.use("/api/senders", senderRoutes);
 app.use("/api/emails/schedule", scheduleRoutes);
 app.use("/api/emails/search", emailSearchRoutes);
