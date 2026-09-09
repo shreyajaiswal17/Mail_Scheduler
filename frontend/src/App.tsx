@@ -22,7 +22,6 @@ const MainContent: React.FC = () => {
           <Mail size={24} />
         </div>
         <div className="w-7 h-7 border-2 border-gray-200 border-t-emerald-500 rounded-full animate-spin"></div>
-        <p className="text-sm font-medium text-gray-500">Verifying secure session...</p>
       </div>
     );
   }
