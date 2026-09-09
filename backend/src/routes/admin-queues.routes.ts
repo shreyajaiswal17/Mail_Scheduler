@@ -20,8 +20,6 @@ createBullBoard({
 
 const router = Router();
 
-router.use(requireAuth);
-router.use(requireAdmin);
 router.use("/", serverAdapter.getRouter());
 
 export default router;

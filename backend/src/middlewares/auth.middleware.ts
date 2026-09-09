@@ -32,6 +32,16 @@ export const requireAuth = async (
       token = req.cookies.token;
     }
 
+    if (!token && req.query && typeof req.query.token === "string") {
+      token = req.query.token;
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+    }
+
     if (!token) {
       res.status(401).json({
         error: "Unauthorized",
