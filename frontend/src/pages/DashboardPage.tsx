@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { ComposeEmailModal } from "../components/ComposeEmailModal";
 import { SlackConnectionCard } from "../components/SlackConnectionCard";
+import { API_BASE_URL } from "../config/api";
 
 interface Sender {
   id: string;
@@ -99,7 +100,7 @@ export const DashboardPage: React.FC = () => {
 
   const checkDb = async () => {
     try {
-      const res = await fetch("http://localhost:5000/health/db");
+      const res = await fetch(`${API_BASE_URL}/health/db`);
       if (res.ok) {
         const data = await res.json();
         setDbStatus(data.database === "connected" ? "Connected" : "Disconnected");
@@ -112,7 +113,7 @@ export const DashboardPage: React.FC = () => {
   const fetchSenders = useCallback(async () => {
     setIsLoadingSenders(true);
     try {
-      const res = await fetch("http://localhost:5000/api/senders", {
+      const res = await fetch(`${API_BASE_URL}/api/senders`, {
         headers: getAuthHeaders(),
         credentials: "include",
       });
@@ -130,11 +131,11 @@ export const DashboardPage: React.FC = () => {
   const fetchEmailCounts = useCallback(async () => {
     try {
       const [schedRes, sentRes] = await Promise.all([
-        fetch("http://localhost:5000/api/emails?status=SCHEDULED&limit=1", {
+        fetch(`${API_BASE_URL}/api/emails?status=SCHEDULED&limit=1`, {
           headers: getAuthHeaders(),
           credentials: "include",
         }),
-        fetch("http://localhost:5000/api/emails?status=SENT&limit=1", {
+        fetch(`${API_BASE_URL}/api/emails?status=SENT&limit=1`, {
           headers: getAuthHeaders(),
           credentials: "include",
         }),
@@ -161,7 +162,7 @@ export const DashboardPage: React.FC = () => {
         setIsLoadingEmails(true);
       }
       const statusParam = activeTab === "scheduled" ? "SCHEDULED" : "SENT";
-      const res = await fetch(`http://localhost:5000/api/emails?status=${statusParam}`, {
+      const res = await fetch(`${API_BASE_URL}/api/emails?status=${statusParam}`, {
         headers: getAuthHeaders(),
         credentials: "include",
       });
@@ -256,7 +257,7 @@ export const DashboardPage: React.FC = () => {
     setSenderSubmitSuccess(null);
 
     try {
-      const res = await fetch("http://localhost:5000/api/senders", {
+      const res = await fetch(`${API_BASE_URL}/api/senders`, {
         method: "POST",
         headers: getAuthHeaders(),
         credentials: "include",

@@ -35,11 +35,11 @@ interface SlackChannelItem {
   is_member: boolean;
 }
 
+import { API_BASE_URL } from "../config/api";
+
 interface SlackConnectionCardProps {
   onStatusChange?: (status: SlackStatusResponse) => void;
 }
-
-const API_BASE_URL = "http://localhost:5000";
 
 const SlackLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
   <svg

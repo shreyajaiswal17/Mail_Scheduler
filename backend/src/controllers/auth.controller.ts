@@ -5,7 +5,7 @@ import { getJwtSecret } from "../config/jwt";
 import { prisma } from "../lib/prisma";
 import { AuthenticatedRequest } from "../middlewares/auth.middleware";
 
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5173").trim().replace(/\/+$/, "");
 
 export const initiateGoogleAuth = (req: Request, res: Response): void => {
   try {
@@ -119,10 +119,12 @@ export const handleGoogleCallback = async (req: Request, res: Response): Promise
       { expiresIn: "7d" }
     );
 
+    const isProduction = process.env.NODE_ENV === "production";
+
     res.cookie("token", sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -153,10 +155,11 @@ export const getCurrentUser = async (req: AuthenticatedRequest, res: Response): 
 };
 
 export const logout = (req: Request, res: Response): void => {
+  const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
   });
 
   res.status(200).json({
@@ -221,10 +224,12 @@ export const emailLogin = async (req: Request, res: Response): Promise<void> => 
       { expiresIn: "7d" }
     );
 
+    const isProduction = process.env.NODE_ENV === "production";
+
     res.cookie("token", sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 

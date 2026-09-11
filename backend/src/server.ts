@@ -17,11 +17,29 @@ import slackRoutes from "./routes/slack.routes";
 
 const app = express();
 
-const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+const rawFrontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+const normalizedFrontend = rawFrontendUrl.trim().replace(/\/+$/, "");
+
+const allowedOrigins = [
+  normalizedFrontend,
+  "https://mail-scheduler-wheat.vercel.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+].filter(Boolean);
 
 app.use(
   cors({
-    origin: [frontendUrl, "http://localhost:5173", "http://127.0.0.1:5173"],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const cleanOrigin = origin.replace(/\/+$/, "");
+      if (
+        allowedOrigins.includes(cleanOrigin) ||
+        cleanOrigin.endsWith(".vercel.app")
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
     credentials: true,
   })
 );
