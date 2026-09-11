@@ -4,7 +4,7 @@ dotenv.config();
 import { assertJwtSecret } from "./config/jwt";
 assertJwtSecret();
 
-import express from "express";
+import express, { Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { prisma } from "./lib/prisma";
@@ -29,9 +29,9 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: (origin, callback) => {
+    origin: (origin: any, callback: any) => {
       if (!origin) return callback(null, true);
-      const cleanOrigin = origin.replace(/\/+$/, "");
+      const cleanOrigin = String(origin).replace(/\/+$/, "");
       if (
         allowedOrigins.includes(cleanOrigin) ||
         cleanOrigin.endsWith(".vercel.app")
@@ -53,14 +53,14 @@ app.use("/api/emails", emailSearchRoutes);
 app.use("/api/slack", slackRoutes);
 app.use("/admin/queues", adminQueuesRoutes);
 
-app.get("/health", (req, res) => {
+app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({
     status: "ok",
     message: "Mail Scheduler API is running",
   });
 });
 
-app.get("/health/db", async (req, res) => {
+app.get("/health/db", async (req: Request, res: Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
 
