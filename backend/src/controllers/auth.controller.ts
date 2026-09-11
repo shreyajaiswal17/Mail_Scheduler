@@ -5,7 +5,13 @@ import { getJwtSecret } from "../config/jwt";
 import { prisma } from "../lib/prisma";
 import { AuthenticatedRequest } from "../middlewares/auth.middleware";
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5173").trim().replace(/\/+$/, "");
+const FRONTEND_URL = (
+  process.env.FRONTEND_URL && process.env.FRONTEND_URL.trim() !== ""
+    ? process.env.FRONTEND_URL.trim().replace(/\/+$/, "")
+    : process.env.NODE_ENV === "production" || process.env.RENDER
+      ? "https://mail-scheduler-wheat.vercel.app"
+      : "http://localhost:5173"
+);
 
 export const initiateGoogleAuth = (req: Request, res: Response): void => {
   try {
